@@ -466,6 +466,22 @@ class TreeherderTool(tk.Tk):
             undo=True, height=15
         )
         self.terminal.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+
+        sb = ttk.Scrollbar(term_frame, command=self.terminal.yview)
+        sb.pack(side=tk.RIGHT, fill=tk.Y)
+        self.terminal.config(yscrollcommand=sb.set)
+
+        self.terminal.tag_config("error",   foreground=T["err_fg"])
+        self.terminal.tag_config("success", foreground=T["ok_fg"])
+        self.terminal.tag_config("info",    foreground=T["info_fg"])
+        self.terminal.tag_config("dim",     foreground=T["dim_fg"])
+        self.terminal.tag_config("warn",    foreground="#ffaa00")
+        self.terminal.tag_config("link",    foreground="#55aaff", underline=True)
+        self.terminal.tag_config("search",  background="#ffff00", foreground="#000000")
+
+        self.terminal.tag_bind("link", "<Button-1>", self._on_link_click)
+        self.terminal.tag_bind("link", "<Enter>", lambda e: self.terminal.config(cursor="hand2"))
+        self.terminal.tag_bind("link", "<Leave>", lambda e: self.terminal.config(cursor=""))
         Tooltip(self.search_entry, "Enter text to search in terminal and press Enter.")
         
         find_btn = ttk.Button(search_f, text="Find", command=self._search_terminal, width=8)
