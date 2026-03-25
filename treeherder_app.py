@@ -269,6 +269,7 @@ class TreeherderTool(tk.Tk):
             background=[("active", T["bg_active"]), ("disabled", T["bg2"])],
             foreground=[("disabled", T["fg_disabled"])]
         )
+        self.bind_class("TButton", "<Enter>", lambda e: e.widget.config(cursor="hand2")) # type: ignore
         style.configure(
             "TCombobox",
             fieldbackground=T["bg2"], background=T["bg3"],
@@ -341,9 +342,11 @@ class TreeherderTool(tk.Tk):
         # Feature: Dark/Light mode toggle
         toggle_text = "☀️ Light" if self._dark else "🌙 Dark"
         self._theme_toggle_label = tk.Label(top, text=toggle_text, bg=T["bg3"], fg=T["fg"],
-                                            font=("Helvetica", 10, "bold"), padx=8, pady=2, relief=tk.FLAT)
+                                            font=("Helvetica", 10, "bold"), padx=8, pady=2, relief=tk.FLAT, cursor="hand2")
         self._theme_toggle_label.pack(side=tk.RIGHT, padx=4)
         self._theme_toggle_label.bind("<Button-1>", lambda e: self._toggle_theme())
+        self._theme_toggle_label.bind("<Enter>", lambda e: self._theme_toggle_label.config(bg=self.T["bg_active"]))
+        self._theme_toggle_label.bind("<Leave>", lambda e: self._theme_toggle_label.config(bg=self.T["bg3"]))
         Tooltip(self._theme_toggle_label, "Switch between Dark and Light mode (CMD+D).")
 
         # Define categorized button groups
@@ -519,13 +522,13 @@ class TreeherderTool(tk.Tk):
         
         # Highlight on hover
         def on_enter(e):
-            if not self.is_running_command:
-                b.config(background=self.T[f"{key_prefix}_hover"])
+            b.config(background=self.T[f"{key_prefix}_hover"])
         def on_leave(e):
             b.config(background=self.T[f"{key_prefix}_btn"])
         
         b.bind("<Enter>", on_enter)
         b.bind("<Leave>", on_leave)
+        b.config(cursor="hand2")
         
         b.key_prefix = key_prefix # type: ignore
         self.btn_widgets.append(b)
@@ -586,8 +589,10 @@ class TreeherderTool(tk.Tk):
 
     def set_buttons_state(self, state):
         if not self.winfo_exists(): return
+        # Note: We no longer set tk.DISABLED on the custom Label buttons 
+        # to avoid the 'graying out' of text. We rely on is_running_command guard.
         for b in self.btn_widgets:
-            b.config(state=state)
+            pass # Keep them visually "enabled" but logically guarded
 
     # -----------------------------------------------------------------------
     # Popup helpers  (main-thread blocking via wait_window)
@@ -714,7 +719,7 @@ class TreeherderTool(tk.Tk):
                     ok()
                 # A flatter button style for history items
                 btn = tk.Label(hist_frame, text=h, bg=self.T["bg2"], fg=self.T["fg"], 
-                               font=("Consolas", 10), padx=6, pady=4, relief=tk.FLAT)
+                               font=("Consolas", 10), padx=6, pady=4, relief=tk.FLAT, cursor="hand2")
                 btn.pack(fill=tk.X, pady=2)
                 btn.bind("<Button-1>", lambda e, v=h: set_val(v))
                 btn.bind("<Enter>", lambda ev, b=btn: b.config(bg=self.T["bg3"]))
@@ -998,7 +1003,7 @@ class TreeherderTool(tk.Tk):
             universal_newlines=True
         )
         if process.stdout:
-            for line in process.stdout:
+            for line in process.stdout: # type: ignore
                 self.process_queue.put(("log", line))
         process.wait()
         return process.returncode
