@@ -287,7 +287,7 @@ class TreeherderTool(tk.Tk):
         tk.Label(top, text="Firefox Repo Path:", bg=T["bg"], fg=T["fg"],
                  font=("Helvetica", 11)).pack(side=tk.LEFT, padx=(0, 8))
 
-        default_repo = os.environ.get("TREEHERDER_TEST_REPO") or self._load_repo_path() or os.getcwd()
+        default_repo = self._load_repo_path() or os.getcwd()
         self.repo_var = tk.StringVar(value=default_repo)
         self.repo_var.trace_add("write", lambda n, i, m: self._save_repo_path(self.repo_var.get()))
 
