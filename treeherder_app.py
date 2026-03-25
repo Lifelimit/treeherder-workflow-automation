@@ -209,32 +209,41 @@ class TreeherderTool(tk.Tk):
         self.status_label = tk.Label(top, textvariable=self.status_var, bg=T["bg"], fg=T["dim_fg"], font=("Helvetica", 11, "bold"))
         self.status_label.pack(side=tk.LEFT, padx=12)
 
-        # ---- Action buttons (2 × 4) ----
-        btn_frame = tk.Frame(main, bg=T["bg"])
-        btn_frame.pack(fill=tk.X, pady=(0, 18))
+        # ---- Action Category Frames ----
+        categories_frame = tk.Frame(main, bg=T["bg"])
+        categories_frame.pack(fill=tk.X, pady=(0, 15))
 
-        defs = [
-            ("Git Fetch",        self.do_fetch),
-            ("Git Pull",         self.do_pull),
-            ("Git Hard Reset",   self.do_hard_reset),
-            ("Single Revert",    self.do_single_revert),
-            ("Multiple Revert",  self.do_multiple_reverts),
-            ("Cherry-Pick",      self.do_cherry_pick),
-            ("Lando Merge",      self.do_merge),
-            ("Lando Merge Back", self.do_push_merge_back),
-            ("Lando Push",       self.do_lando_push),
-            ("View Git Log",     self.do_view_log),
-            ("Update WPT",       self.do_update_wpt),
+        # Define categorized button groups
+        groups = [
+            ("Git & Repo", [
+                ("Git Fetch",      self.do_fetch),
+                ("Git Pull",       self.do_pull),
+                ("Git Hard Reset", self.do_hard_reset),
+                ("View Git Log",   self.do_view_log),
+            ]),
+            ("Lando Flow", [
+                ("Cherry-Pick",      self.do_cherry_pick),
+                ("Lando Merge",      self.do_merge),
+                ("Lando Merge Back", self.do_push_merge_back),
+                ("Lando Push",       self.do_lando_push),
+            ]),
+            ("Workflows & WPT", [
+                ("Single Revert",    self.do_single_revert),
+                ("Multiple Revert",  self.do_multiple_reverts),
+                ("Update WPT",       self.do_update_wpt),
+            ])
         ]
-        self.btn_widgets = []
-        for text, cmd in defs:
-            b = ttk.Button(btn_frame, text=text, command=cmd, width=15)
-            self.btn_widgets.append(b)
 
-        for idx, w in enumerate(self.btn_widgets):
-            w.grid(row=idx // 3, column=idx % 3, padx=5, pady=5, sticky="ew")
-        for i in range(3):
-            btn_frame.columnconfigure(i, weight=1)
+        self.btn_widgets = []
+        for col_idx, (group_name, cmds) in enumerate(groups):
+            lf = ttk.LabelFrame(categories_frame, text=f" {group_name} ", padding=8)
+            lf.grid(row=0, column=col_idx, padx=5, sticky="nsew")
+            categories_frame.columnconfigure(col_idx, weight=1)
+            
+            for row_idx, (text, cmd) in enumerate(cmds):
+                b = ttk.Button(lf, text=text, command=cmd)
+                b.pack(fill=tk.X, pady=2)
+                self.btn_widgets.append(b)
 
         # ---- Terminal ----
         lbl_frame = tk.Frame(main, bg=T["bg"])
