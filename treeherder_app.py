@@ -250,10 +250,12 @@ class TreeherderTool(tk.Tk):
         col2 = tk.Frame(categories_frame, bg=T["bg"])
         col2.grid(row=0, column=2, padx=5, sticky="nsew")
         categories_frame.columnconfigure(2, weight=1)
+        categories_frame.rowconfigure(0, weight=1) # Ensure all columns have equal height
 
-        for group_name, cmds in groups[2:]:
+        for r_idx, (group_name, cmds) in enumerate(groups[2:]):
             lf = ttk.LabelFrame(col2, text=f" {group_name} ", padding=8)
-            lf.pack(fill=tk.X, pady=(0, 5))
+            lf.grid(row=r_idx, column=0, padx=0, pady=(0, 5), sticky="new")
+            col2.columnconfigure(0, weight=1)
             for text, cmd in cmds:
                 b = ttk.Button(lf, text=text, command=cmd)
                 b.pack(fill=tk.X, pady=2)
