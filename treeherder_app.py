@@ -80,6 +80,8 @@ def build_theme(dark: bool) -> dict:
             revert_hover="#8a2701",
             wpt_btn="#452c63",      # Deep Purple
             wpt_hover="#36224d",
+            lint_btn="#008b8b",     # Teal
+            lint_hover="#006b6b",
             btn_fg="#ffffff",
         )
     else:
@@ -97,14 +99,16 @@ def build_theme(dark: bool) -> dict:
             ok_fg="#28a745",
             info_fg="#007bff",
             dim_fg="#6c757d",
-            git_btn="#0078d4",
-            git_hover="#005a9e",
-            lando_btn="#107c10",
-            lando_hover="#0b5a0b",
-            revert_btn="#d83b01",
-            revert_hover="#a42e01",
-            wpt_btn="#5c2d91",
-            wpt_hover="#401e66",
+            git_btn="#1976D2",      # Softer Material Blue
+            git_hover="#1565C0",
+            lando_btn="#2E7D32",    # Softer Material Green
+            lando_hover="#1B5E20",
+            revert_btn="#D84315",   # Deeper burnt orange
+            revert_hover="#BF360C",
+            wpt_btn="#6A1B9A",      # Softer Muted Purple
+            wpt_hover="#4A148C",
+            lint_btn="#00838F",     # Professional Dark Teal
+            lint_hover="#006064",
             btn_fg="#ffffff",
         )
 
@@ -335,15 +339,11 @@ class TreeherderTool(tk.Tk):
         self._theme_toggle_label.bind("<Button-1>", lambda e: self._toggle_theme())
         Tooltip(self._theme_toggle_label, "Switch between Dark and Light mode (CMD+D).")
 
-        # ---- Action Category Frames ----
-        categories_frame = tk.Frame(main, bg=T["bg"])
-        categories_frame.pack(fill=tk.X, pady=(0, 15))
-
         # Define categorized button groups
         groups = [
             ("Git & Repo", [
                 ("Git Fetch",      self.do_fetch, "Download objects and refs from another repository."),
-                ("Git Pull",       self.do_pull, "Fetch from and integrate with another repository or a local branch."),
+                ("Git Pull",       self.do_pull, "Fetch from and integrate with another repository or local branch."),
                 ("Git Hard Reset", self.do_hard_reset, "Reset current HEAD (WARNING: discards local changes)."),
                 ("Revert Last Action", self.do_undo_last, "Revert the most recent repository change using git reflog."),
                 ("View Git Log",   self.do_view_log, "Show commit logs for the current branch."),
@@ -353,10 +353,16 @@ class TreeherderTool(tk.Tk):
                 ("Lando Merge",      self.do_merge, "Merge specific changesets from the source repository into the target destination."),
                 ("Lando Merge Back", self.do_push_merge_back, "Push a merge back to the integration branch."),
                 ("Lando Push",       self.do_lando_push, "Directly push to the current active branch."),
+                ("Upgrade Lando",    self.do_upgrade_lando, "Run pipx upgrade lando_cli to update the Mozilla Lando CLI."),
             ]),
             ("Reverts", [
                 ("Single Revert",    self.do_single_revert, "Create a revert commit for a single revision."),
                 ("Multiple Revert",  self.do_multiple_reverts, "Create revert commits for a range of revisions."),
+            ]),
+            ("Linting", [
+                ("Prettier Fix",     self.do_lint_prettier, "Run Prettier linter with --fix on specified paths."),
+                ("Whitespace Fix",   self.do_lint_whitespace, "Run Whitespace linter with --fix on specified paths."),
+                ("Black Fix",        self.do_lint_black, "Run Black linter with --fix on specified paths."),
             ]),
             ("WPT Metadata", [
                 ("Update WPT",       self.do_update_wpt, "Update WPT metadata for a single test."),
@@ -365,33 +371,43 @@ class TreeherderTool(tk.Tk):
         ]
 
         self.btn_widgets = []
-        # Column 0 & 1: Standard Groups
-        for col_idx, (group_name, cmds) in enumerate(groups[:2]): # type: ignore
-            lf = ttk.LabelFrame(categories_frame, text=f" {group_name} ", padding=8)
-            lf.grid(row=0, column=col_idx, padx=5, sticky="nsew")
-            categories_frame.columnconfigure(col_idx, weight=1)
-            
-            # Map group name to color key prefix
-            prefix = "git" if "Git" in group_name else "lando"
-            
-            for text, cmd, tip in cmds:
-                self._add_colored_btn(lf, text, cmd, prefix, tip)
-        
-        # Column 2: Revert and WPT (stacked vertically)
-        col2 = tk.Frame(categories_frame, bg=T["bg"])
-        col2.grid(row=0, column=2, padx=5, sticky="nsew")
-        categories_frame.columnconfigure(2, weight=1)
-        categories_frame.rowconfigure(0, weight=1)
+        # ---- Action Category Frames ----
+        categories_frame = tk.Frame(main, bg=T["bg"])
+        categories_frame.pack(fill=tk.X, pady=(0, 15))
 
-        for r_idx, (group_name, cmds) in enumerate(groups[2:]): # type: ignore
-            lf = ttk.LabelFrame(col2, text=f" {group_name} ", padding=8)
-            lf.grid(row=r_idx, column=0, padx=0, pady=(0, 5), sticky="new")
-            col2.columnconfigure(0, weight=1)
-            
-            prefix = "revert" if "Revert" in group_name else "wpt"
-            
-            for text, cmd, tip in cmds:
-                self._add_colored_btn(lf, text, cmd, prefix, tip)
+        # Configure 3 equal-width columns
+        for i in range(3):
+            categories_frame.columnconfigure(i, weight=1, uniform="group1")
+
+        # 1. Git & Repo (Left Column, Top)
+        lf_git = ttk.LabelFrame(categories_frame, text=" Git & Repo ", padding=(10, 8))
+        lf_git.grid(row=0, column=0, padx=(0, 5), pady=(0, 10), sticky="new") # Removed rowspan
+        for text, cmd, tip in groups[0][1]:
+            self._add_colored_btn(lf_git, text, cmd, "git", tip)
+
+        # 2. Lando Flow (Middle Column, Top)
+        lf_lando = ttk.LabelFrame(categories_frame, text=" Lando Flow ", padding=(10, 8))
+        lf_lando.grid(row=0, column=1, padx=5, pady=(0, 10), sticky="new")
+        for text, cmd, tip in groups[1][1]:
+            self._add_colored_btn(lf_lando, text, cmd, "lando", tip)
+
+        # 3. Linting (Right Column, Top)
+        lf_lint = ttk.LabelFrame(categories_frame, text=" Linting ", padding=(10, 8))
+        lf_lint.grid(row=0, column=2, padx=(5, 0), pady=(0, 10), sticky="new")
+        for text, cmd, tip in groups[3][1]:
+            self._add_colored_btn(lf_lint, text, cmd, "lint", tip)
+
+        # 4. Reverts (Left Column, Bottom) - Shifted to column 0
+        lf_revert = ttk.LabelFrame(categories_frame, text=" Reverts ", padding=(10, 8))
+        lf_revert.grid(row=1, column=0, padx=(0, 5), pady=(0, 10), sticky="new")
+        for text, cmd, tip in groups[2][1]:
+            self._add_colored_btn(lf_revert, text, cmd, "revert", tip)
+
+        # 5. WPT Metadata (Middle Column, Bottom) - Shifted to column 1
+        lf_wpt = ttk.LabelFrame(categories_frame, text=" WPT Metadata ", padding=(10, 8))
+        lf_wpt.grid(row=1, column=1, padx=5, pady=(0, 10), sticky="new")
+        for text, cmd, tip in groups[4][1]:
+            self._add_colored_btn(lf_wpt, text, cmd, "wpt", tip)
 
         # ---- Terminal ----
         lbl_frame = tk.Frame(main, bg=T["bg"])
@@ -486,8 +502,8 @@ class TreeherderTool(tk.Tk):
         # Using a Label provides 100% control over color on macOS.
         b = tk.Label(parent, text=text, bg=T[f"{key_prefix}_btn"], fg=T["btn_fg"],
                      font=("Helvetica", 11, "bold"),
-                     padx=10, pady=8, cursor="hand2", relief=tk.FLAT)
-        b.pack(fill=tk.X, pady=3)
+                     padx=10, pady=5, cursor="hand2", relief=tk.FLAT)
+        b.pack(fill=tk.X, pady=4)
         
         # Click effect
         def on_click(e):
@@ -792,12 +808,17 @@ class TreeherderTool(tk.Tk):
         # 1. Update ttk Styles
         style = ttk.Style(self)
         style.configure(".", background=T["bg"], foreground=T["fg"])
+        style.configure("TLabelframe", background=T["bg"], bordercolor=T["bg3"], borderwidth=1)
+        style.configure("TLabelframe.Label", background=T["bg"], foreground=T["dim_fg"], font=("Helvetica", 10, "bold"))
         style.configure("TButton", background=T["bg3"], foreground=T["fg_btn"])
         style.configure("TCombobox", fieldbackground=T["bg2"], background=T["bg3"], foreground=T["fg"], arrowcolor=T["fg"])
         style.map("TCombobox", 
                   fieldbackground=[("readonly", T["bg2"]), ("disabled", T["bg"])],
                   foreground=[("readonly", T["fg"]), ("disabled", T["fg_disabled"])])
         style.map("TButton", background=[("active", T["bg_active"]), ("disabled", T["bg2"])], foreground=[("disabled", T["fg_disabled"])])
+        
+        style.configure("TLabelframe", background=T["bg"], bordercolor=T["bg3"], borderwidth=1)
+        style.configure("TLabelframe.Label", background=T["bg"], foreground=T["dim_fg"], font=("Helvetica", 10, "bold"))
         
         # 2. Apply theme to self
         self.configure(bg=T["bg"])
@@ -962,6 +983,26 @@ class TreeherderTool(tk.Tk):
         additions = os.pathsep.join(p for p in extra if p not in current_path)
         e["PATH"] = additions + os.pathsep + current_path if additions else current_path
         return e
+
+    def _run_command_inline(self, cmd, env=None, cwd=None):
+        """Run a command synchronously and stream its output to the UI terminal."""
+        cwd = cwd or self._cwd()
+        env = self._build_env(env)
+        process = subprocess.Popen(
+            cmd,
+            stdout=subprocess.PIPE,
+            stderr=subprocess.STDOUT,
+            text=True,
+            cwd=cwd,
+            env=env,
+            bufsize=1,
+            universal_newlines=True
+        )
+        if process.stdout:
+            for line in process.stdout:
+                self.process_queue.put(("log", line))
+        process.wait()
+        return process.returncode
 
     def run_cmd(self, cmd, env=None, cwd=None):
         cwd = cwd or self._cwd()
@@ -1422,6 +1463,13 @@ class TreeherderTool(tk.Tk):
 
         self.execute_workflow("Lando Push", logic)
 
+    def do_upgrade_lando(self):
+        def logic():
+            self.process_queue.put(("log", "\n> Upgrading Lando CLI via pipx...\n"))
+            self.run_cmd(["pipx", "upgrade", "lando_cli"])
+        
+        self.execute_workflow("Upgrade Lando CLI", logic)
+
     def do_view_log(self):
         try:
             author_email = subprocess.check_output(
@@ -1723,6 +1771,106 @@ class TreeherderTool(tk.Tk):
             self.execute_workflow("Save WPT & Diff", lambda: self.run_cmd(["git", "diff", meta_path]))
 
         ttk.Button(top, text="Save to File", command=save, width=20).pack(pady=(0, 15))
+
+    # -----------------------------------------------------------------------
+    # Automated Linting Fixes
+    # -----------------------------------------------------------------------
+    
+    def do_lint_prettier(self):   self._run_lint("prettier")
+    def do_lint_whitespace(self): self._run_lint("whitespace")
+    def do_lint_black(self):      self._run_lint("black")
+
+    def _run_lint(self, linter_type):
+        top = self._make_popup(f"Mach Lint Fix: {linter_type.title()}", 320)
+        
+        # Bug Number
+        tk.Label(top, text="Bug Number (e.g. 1234567):", bg=self.T["bg"], fg=self.T["fg"], font=("Helvetica", 11)).pack(pady=(15, 4))
+        bug_entry = tk.Entry(top, bg=self.T["bg2"], fg=self.T["fg"], insertbackground=self.T["fg"], font=("Helvetica", 11), relief=tk.FLAT)
+        bug_entry.pack(fill=tk.X, padx=20, ipady=4)
+        
+        path_lbl = tk.Label(top, text="Test Path(s) (space separated):", bg=self.T["bg"], fg=self.T["fg"], font=("Helvetica", 11))
+        path_lbl.pack(pady=(14, 4))
+        path_entry = tk.Entry(top, bg=self.T["bg2"], fg=self.T["fg"], insertbackground=self.T["fg"], font=("Helvetica", 11), relief=tk.FLAT)
+        path_entry.pack(fill=tk.X, padx=20, ipady=4)
+        
+        def start_workflow():
+            bug_no = bug_entry.get().strip()
+            paths_str = path_entry.get().strip()
+            top.destroy()
+            
+            if not bug_no or not paths_str:
+                messagebox.showerror("Error", "Both Bug Number and Paths are required.")
+                return
+
+            paths = paths_str.split()
+            cwd = self._cwd()
+            mach = os.path.join(cwd, "mach")
+            if not os.path.exists(mach):
+                self.process_queue.put(("log", f"! Error: 'mach' executable not found in {cwd}. Automated linting requires a Firefox source tree.\n"))
+                messagebox.showerror("Error", f"'mach' was not found in {cwd}.\n\nPlease ensure you are running this in a Firefox source repository.")
+                return
+
+            if platform.system() == "Windows":
+                mach_cmd = ["python", mach]
+            else:
+                mach_cmd = [mach]
+
+            def work():
+                self.process_queue.put(("log", f"\n>>> Starting Automated {linter_type.upper()} Fix Workflow...\n"))
+                
+                # 1. git pull
+                self._run_command_inline(["git", "pull"])
+                
+                # 2. Run linter
+                if linter_type == "prettier":
+                    cmd = mach_cmd + ["lint", "--fix"] + paths
+                elif linter_type == "whitespace":
+                    cmd = mach_cmd + ["lint", "--linter", "file-whitespace", "--fix"] + paths
+                else: # black
+                    cmd = mach_cmd + ["lint", "-l", "black", "--fix"] + paths
+                
+                self.process_queue.put(("log", f"> Running: {' '.join(cmd)}\n"))
+                # Linters often exit >0 if they fix things but leave warnings. We ignore exit code.
+                subprocess.run(cmd, cwd=cwd, capture_output=True)
+                
+                # 3. Check for modifications
+                status = subprocess.check_output(["git", "status", "--porcelain"] + paths, cwd=cwd).decode().strip()
+                if not status:
+                    self.process_queue.put(("log", "> No changes detected after linting. Aborting.\n"))
+                    messagebox.showinfo("Lint Fix", "No files were modified by the linter.")
+                    return
+
+                # 4. git add
+                self._run_command_inline(["git", "add"] + paths)
+                
+                # 5. Commit formatting
+                suffix = "a=lint-fix"
+                if len(paths) == 1:
+                    basename = os.path.basename(paths[0])
+                    msg = f"Bug {bug_no} - Fix lint failure in {basename} {suffix}"
+                else:
+                    msg = f"Bug {bug_no} - Fix lint failure {suffix}"
+                
+                self._run_command_inline(["git", "commit", "-m", msg])
+                self.process_queue.put(("log", f"> Committed: {msg}\n"))
+                
+                # 6. Push confirmation
+                if self.ask_yes_no_threadsafe("Push to Lando?", f"Commit created:\n\n{msg}\n\nPush to Lando now?"):
+                    branch = self.branch_var.get()
+                    lando_repo = f"firefox-{branch}"
+                    self.process_queue.put(("log", f"> Pushing to Lando ({lando_repo})...\n"))
+                    self._run_command_inline(["lando", "push-commits", "--lando-repo", lando_repo])
+                    
+                    # 7. Local Reset
+                    self.process_queue.put(("log", "> Rolling back local commit (git reset --hard HEAD~1)...\n"))
+                    self._run_command_inline(["git", "reset", "--hard", "HEAD~1"])
+                    self.process_queue.put(("log", ">>> Lint Fix Workflow Complete.\n"))
+                else:
+                    self.process_queue.put(("log", "> Push aborted. Commit kept locally.\n"))
+
+            threading.Thread(target=work, daemon=True).start()
+
+        self._ok_cancel(top, start_workflow, lambda ev=None: top.destroy())
 
 if __name__ == "__main__":
     app = TreeherderTool()
