@@ -73,15 +73,15 @@ def build_theme(dark: bool) -> dict:
             dim_fg="#7f849c",
             # Professional muted buttons
             git_btn="#1c5d99",      # Deeper Business Blue
-            git_hover="#164c7e",
+            git_hover="#2b7fd1",    # Lighter for highlight
             lando_btn="#1a5d1a",    # Deeper Forest Green
-            lando_hover="#144914",
+            lando_hover="#288d28",   # Lighter for highlight
             revert_btn="#a42e01",   # Burnt Orange/Red
-            revert_hover="#8a2701",
+            revert_hover="#cd3a01",  # Lighter for highlight
             wpt_btn="#452c63",      # Deep Purple
-            wpt_hover="#36224d",
+            wpt_hover="#64408f",     # Lighter for highlight
             lint_btn="#008b8b",     # Teal
-            lint_hover="#006b6b",
+            lint_hover="#00b3b3",    # Lighter for highlight
             btn_fg="#ffffff",
         )
     else:
@@ -100,15 +100,15 @@ def build_theme(dark: bool) -> dict:
             info_fg="#007bff",
             dim_fg="#6c757d",
             git_btn="#1976D2",      # Softer Material Blue
-            git_hover="#1565C0",
+            git_hover="#42a5f5",    # Lighter highlight
             lando_btn="#2E7D32",    # Softer Material Green
-            lando_hover="#1B5E20",
+            lando_hover="#66bb6a",   # Lighter highlight
             revert_btn="#D84315",   # Deeper burnt orange
-            revert_hover="#BF360C",
+            revert_hover="#ff7043",  # Lighter highlight
             wpt_btn="#6A1B9A",      # Softer Muted Purple
-            wpt_hover="#4A148C",
+            wpt_hover="#ab47bc",     # Lighter highlight
             lint_btn="#00838F",     # Professional Dark Teal
-            lint_hover="#006064",
+            lint_hover="#26c6da",    # Lighter highlight
             btn_fg="#ffffff",
         )
 
