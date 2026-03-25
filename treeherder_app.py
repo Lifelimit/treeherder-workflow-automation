@@ -341,7 +341,7 @@ class TreeherderTool(tk.Tk):
         # Feature: Dark/Light mode toggle
         toggle_text = "☀️ Light" if self._dark else "🌙 Dark"
         self._theme_toggle_label = tk.Label(top, text=toggle_text, bg=T["bg3"], fg=T["fg"],
-                                            font=("Helvetica", 10, "bold"), padx=8, pady=2, cursor="hand2", relief=tk.FLAT)
+                                            font=("Helvetica", 10, "bold"), padx=8, pady=2, relief=tk.FLAT)
         self._theme_toggle_label.pack(side=tk.RIGHT, padx=4)
         self._theme_toggle_label.bind("<Button-1>", lambda e: self._toggle_theme())
         Tooltip(self._theme_toggle_label, "Switch between Dark and Light mode (CMD+D).")
@@ -480,8 +480,6 @@ class TreeherderTool(tk.Tk):
         self.terminal.tag_config("search",  background="#ffff00", foreground="#000000")
 
         self.terminal.tag_bind("link", "<Button-1>", self._on_link_click)
-        self.terminal.tag_bind("link", "<Enter>", lambda e: self.terminal.config(cursor="hand2"))
-        self.terminal.tag_bind("link", "<Leave>", lambda e: self.terminal.config(cursor=""))
         Tooltip(self.search_entry, "Enter text to search in terminal and press Enter.")
         
         find_btn = ttk.Button(search_f, text="Find", command=self._search_terminal, width=8)
@@ -509,7 +507,7 @@ class TreeherderTool(tk.Tk):
         # Using a Label provides 100% control over color on macOS.
         b = tk.Label(parent, text=text, bg=T[f"{key_prefix}_btn"], fg=T["btn_fg"],
                      font=("Helvetica", 11, "bold"),
-                     padx=10, pady=5, cursor="hand2", relief=tk.FLAT)
+                     padx=10, pady=5, relief=tk.FLAT)
         b.pack(fill=tk.X, pady=4)
         
         # Click effect
@@ -720,7 +718,7 @@ class TreeherderTool(tk.Tk):
                     ok()
                 # A flatter button style for history items
                 btn = tk.Label(hist_frame, text=h, bg=self.T["bg2"], fg=self.T["fg"], 
-                               font=("Consolas", 10), cursor="hand2", padx=6, pady=4, relief=tk.FLAT)
+                               font=("Consolas", 10), padx=6, pady=4, relief=tk.FLAT)
                 btn.pack(fill=tk.X, pady=2)
                 btn.bind("<Button-1>", lambda e, v=h: set_val(v))
                 btn.bind("<Enter>", lambda ev, b=btn: b.config(bg=self.T["bg3"]))
