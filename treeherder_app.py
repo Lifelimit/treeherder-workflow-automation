@@ -252,6 +252,12 @@ class TreeherderTool(tk.Tk):
             pass
 
         style.configure(".", background=T["bg"], foreground=T["fg"])
+        
+        # --- FIX: Apply LabelFrame styles on startup ---
+        style.configure("TLabelframe", background=T["bg"], bordercolor=T["bg3"], borderwidth=1)
+        style.configure("TLabelframe.Label", background=T["bg"], foreground=T["dim_fg"], font=("Helvetica", 10, "bold"))
+        # -----------------------------------------------
+
         style.configure(
             "TButton",
             background=T["bg3"], foreground=T["fg_btn"],
