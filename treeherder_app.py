@@ -1066,7 +1066,13 @@ class TreeherderTool(tk.Tk):
             if messagebox.askyesno("Create File?", f"Meta file does not exist:\n{relative_meta}\n\nDo you want to create it?"):
                 os.makedirs(os.path.dirname(meta_path), exist_ok=True)
                 with open(meta_path, "w", encoding="utf-8") as f:
-                    f.write(f"[{os.path.basename(test_path)}]\n")
+                    filename = os.path.basename(test_path)
+                    # Use standard WPT indentation: 0 for root, 2 for subtest, 4 for expected
+                    f.write(f"[{filename}]\n")
+                    if subtest_name and subtest_name != filename:
+                        f.write(f"  [{subtest_name}]\n    expected: \n")
+                    else:
+                        f.write(f"    expected: \n")
             else:
                 return
 
@@ -1081,6 +1087,12 @@ class TreeherderTool(tk.Tk):
         toolbar.pack(fill=tk.X, padx=10, pady=5)
 
         def insert_text(txt):
+            # Check if we are at the start of a line to handle indentation
+            line_str = self._wpt_text.get("insert linestart", "insert")
+            if not line_str.strip() and not line_str.startswith("    "):
+                # Automatically add 4-space indentation for new properties/conditions
+                self._wpt_text.insert("insert linestart", "    ")
+            
             self._wpt_text.insert(tk.INSERT, txt)
 
         def delete_line():
