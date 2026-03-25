@@ -68,6 +68,13 @@ def build_theme(dark: bool) -> dict:
             ok_fg="#55ff55",
             info_fg="#55ffff",
             dim_fg="#888888",
+            # Vibrant button colors for dark theme
+            git_btn="#0078d4",  # Office Blue
+            lando_btn="#107c10",  # Office Green
+            revert_btn="#d83b01",  # Office Orange/Red
+            wpt_btn="#5c2d91",  # Office Purple
+            btn_fg="#ffffff",
+            btn_hover_bg_darker="#005a9e", # Slightly darker for hover
         )
     else:
         return dict(
@@ -84,6 +91,13 @@ def build_theme(dark: bool) -> dict:
             ok_fg="#007700",
             info_fg="#0055cc",
             dim_fg="#555555",
+            # Vibrant button colors for light theme
+            git_btn="#0078d4",  # Office Blue
+            lando_btn="#107c10",  # Office Green
+            revert_btn="#d83b01",  # Office Orange/Red
+            wpt_btn="#5c2d91",  # Office Purple
+            btn_fg="#ffffff",
+            btn_hover_bg_darker="#005a9e", # Slightly darker for hover
         )
 
 
@@ -237,29 +251,33 @@ class TreeherderTool(tk.Tk):
         ]
 
         self.btn_widgets = []
+        # Column 0 & 1: Standard Groups
         for col_idx, (group_name, cmds) in enumerate(groups[:2]):
             lf = ttk.LabelFrame(categories_frame, text=f" {group_name} ", padding=8)
             lf.grid(row=0, column=col_idx, padx=5, sticky="nsew")
             categories_frame.columnconfigure(col_idx, weight=1)
+            
+            # Map group name to color
+            color = T["git_btn"] if "Git" in group_name else T["lando_btn"]
+            
             for text, cmd in cmds:
-                b = ttk.Button(lf, text=text, command=cmd)
-                b.pack(fill=tk.X, pady=2)
-                self.btn_widgets.append(b)
+                self._add_colored_btn(lf, text, cmd, color)
         
         # Column 2: Revert and WPT (stacked vertically)
         col2 = tk.Frame(categories_frame, bg=T["bg"])
         col2.grid(row=0, column=2, padx=5, sticky="nsew")
         categories_frame.columnconfigure(2, weight=1)
-        categories_frame.rowconfigure(0, weight=1) # Ensure all columns have equal height
+        categories_frame.rowconfigure(0, weight=1)
 
         for r_idx, (group_name, cmds) in enumerate(groups[2:]):
             lf = ttk.LabelFrame(col2, text=f" {group_name} ", padding=8)
             lf.grid(row=r_idx, column=0, padx=0, pady=(0, 5), sticky="new")
             col2.columnconfigure(0, weight=1)
+            
+            color = T["revert_btn"] if "Revert" in group_name else T["wpt_btn"]
+            
             for text, cmd in cmds:
-                b = ttk.Button(lf, text=text, command=cmd)
-                b.pack(fill=tk.X, pady=2)
-                self.btn_widgets.append(b)
+                self._add_colored_btn(lf, text, cmd, color)
 
         # ---- Terminal ----
         lbl_frame = tk.Frame(main, bg=T["bg"])
@@ -322,6 +340,29 @@ class TreeherderTool(tk.Tk):
     # -----------------------------------------------------------------------
     # Queue / UI helpers
     # -----------------------------------------------------------------------
+
+    def _add_colored_btn(self, parent, text, cmd, bg_color):
+        T = self.T
+        b = tk.Button(parent, text=text, command=cmd, 
+                      bg=bg_color, fg=T["btn_fg"], 
+                      activebackground=bg_color, activeforeground=T["btn_fg"],
+                      font=("Helvetica", 10, "bold"),
+                      relief=tk.FLAT, pady=6, cursor="hand2")
+        b.pack(fill=tk.X, pady=2)
+        
+        # Simple highlight on hover
+        def on_enter(e): b.config(background=T["btn_hover_bg_darker"])
+        def on_leave(e): b.config(background=bg_color)
+        
+        b.bind("<Enter>", on_enter)
+        b.bind("<Leave>", on_leave)
+
+        # On macOS, standard tk.Button doesn't show background color well 
+        # unless you use highlightbackground or a specific wrapper.
+        if platform.system() == "Darwin":
+            b.config(highlightbackground=T["bg"], borderwidth=0)
+
+        self.btn_widgets.append(b)
 
     def _startup_git_check(self):
         """Run once at startup: warn user if repo has an in-progress git operation."""
