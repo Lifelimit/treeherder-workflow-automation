@@ -446,35 +446,9 @@ class TreeherderTool(tk.Tk):
         self.progress.pack(side=tk.RIGHT, padx=10)
         self.progress.pack_forget()
 
-        term_frame = tk.Frame(main, bg=T["bg"])
-        term_frame.pack(fill=tk.BOTH, expand=True)
-
-        self.terminal = tk.Text(
-            term_frame, bg=T["term_bg"], fg=T["term_fg"],
-            font=("Consolas", 10), state=tk.DISABLED, wrap=tk.WORD,
-            undo=True
-        )
-        self.terminal.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-
-        sb = ttk.Scrollbar(term_frame, command=self.terminal.yview)
-        sb.pack(side=tk.RIGHT, fill=tk.Y)
-        self.terminal.config(yscrollcommand=sb.set)
-
-        self.terminal.tag_config("error",   foreground=T["err_fg"])
-        self.terminal.tag_config("success", foreground=T["ok_fg"])
-        self.terminal.tag_config("info",    foreground=T["info_fg"])
-        self.terminal.tag_config("dim",     foreground=T["dim_fg"])
-        self.terminal.tag_config("warn",    foreground="#ffaa00")
-        self.terminal.tag_config("link",    foreground="#55aaff", underline=True)
-        self.terminal.tag_config("search",  background="#ffff00", foreground="#000000")
-
-        self.terminal.tag_bind("link", "<Button-1>", self._on_link_click)
-        self.terminal.tag_bind("link", "<Enter>", lambda e: self.terminal.config(cursor="hand2"))
-        self.terminal.tag_bind("link", "<Leave>", lambda e: self.terminal.config(cursor=""))
-
-        # ---- Search bar below terminal ----
+        # ---- Search bar below terminal (Pack first to ensure space) ----
         search_f = tk.Frame(main, bg=T["bg"])
-        search_f.pack(fill=tk.X, pady=(4, 0))
+        search_f.pack(side=tk.BOTTOM, fill=tk.X, pady=(4, 0))
         
         tk.Label(search_f, text="Search Terminal:", bg=T["bg"], fg=T["dim_fg"], font=("Helvetica", 10)).pack(side=tk.LEFT)
         self.search_var = tk.StringVar()
@@ -482,6 +456,16 @@ class TreeherderTool(tk.Tk):
                                      insertbackground=T["fg"], font=("Helvetica", 10), relief=tk.FLAT, width=30)
         self.search_entry.pack(side=tk.LEFT, padx=8, ipady=2)
         self.search_entry.bind("<Return>", lambda e: self._search_terminal())
+
+        term_frame = tk.Frame(main, bg=T["bg"])
+        term_frame.pack(fill=tk.BOTH, expand=True)
+
+        self.terminal = tk.Text(
+            term_frame, bg=T["term_bg"], fg=T["term_fg"],
+            font=("Consolas", 10), state=tk.DISABLED, wrap=tk.WORD,
+            undo=True, height=15
+        )
+        self.terminal.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
         Tooltip(self.search_entry, "Enter text to search in terminal and press Enter.")
         
         find_btn = ttk.Button(search_f, text="Find", command=self._search_terminal, width=8)
