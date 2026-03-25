@@ -224,6 +224,7 @@ class TreeherderTool(tk.Tk):
             ("Lando Merge Back", self.do_push_merge_back),
             ("Lando Push",       self.do_lando_push),
             ("View Git Log",     self.do_view_log),
+            ("Update WPT",       self.do_update_wpt),
         ]
         self.btn_widgets = []
         for text, cmd in defs:
@@ -1042,6 +1043,87 @@ class TreeherderTool(tk.Tk):
             self.terminal.tag_add(tmp_tag, pos, f"{pos} + {len(query)}c")
             # Clear it after a moment
             self.after(800, lambda: self.terminal.tag_remove(tmp_tag, "1.0", tk.END))
+
+    def do_update_wpt(self):
+        log_line = self.ask_input("Update WPT", "Paste Treeherder TEST-UNEXPECTED log line:")
+        if not log_line: return
+
+        m = re.search(r"TEST-UNEXPECTED\s*\|\s*([^|]+)\s*\|\s*([^|]+)", log_line)
+        if not m:
+            messagebox.showerror("Error", "Could not parse log line. Expected format:\nTEST-UNEXPECTED | /path/to/test.html | subtest - expected FAIL")
+            return
+        
+        test_path = m.group(1).strip()
+        subtest_raw = m.group(2).strip()
+        subtest_name = re.split(r"\s+-\s+expected\s+", subtest_raw, flags=re.IGNORECASE)[0]
+
+        cwd = self._cwd()
+        meta_root = os.path.join(cwd, "testing", "web-platform", "meta")
+        relative_meta = test_path.lstrip("/") + ".ini"
+        meta_path = os.path.join(meta_root, relative_meta)
+
+        if not os.path.exists(meta_path):
+            if messagebox.askyesno("Create File?", f"Meta file does not exist:\n{relative_meta}\n\nDo you want to create it?"):
+                os.makedirs(os.path.dirname(meta_path), exist_ok=True)
+                with open(meta_path, "w", encoding="utf-8") as f:
+                    f.write(f"[{os.path.basename(test_path)}]\n")
+            else:
+                return
+
+        self.open_wpt_editor(meta_path, subtest_name)
+
+    def open_wpt_editor(self, meta_path, subtest_name):
+        top = self._make_popup(f"WPT Editor: {os.path.basename(meta_path)}", 600)
+        top.geometry("800x650")
+        T = self.T
+
+        toolbar = tk.Frame(top, bg=T["bg2"])
+        toolbar.pack(fill=tk.X, padx=10, pady=5)
+
+        def insert_text(txt):
+            self._wpt_text.insert(tk.INSERT, txt)
+
+        def delete_line():
+            self._wpt_text.delete("insert linestart", "insert lineend + 1c")
+
+        btns = [
+            ("win", 'if os == "win": '), ("mac", 'if os == "mac": '), ("linux", 'if os == "linux": '),
+            ("android", 'if os == "android": '), ("debug", 'if debug: '), ("asan", 'if asan: '),
+            ("FAIL", "FAIL"), ("PASS", "PASS"),
+        ]
+        for lbl, val in btns:
+            ttk.Button(toolbar, text=lbl, width=8, command=lambda v=val: insert_text(v)).pack(side=tk.LEFT, padx=2)
+        ttk.Button(toolbar, text="Delete Line", width=12, command=delete_line).pack(side=tk.RIGHT, padx=5)
+
+        txt_frame = tk.Frame(top, bg=T["bg"])
+        txt_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
+        self._wpt_text = tk.Text(txt_frame, bg=T["term_bg"], fg=T["term_fg"], font=("Consolas", 10), undo=True)
+        self._wpt_text.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        sb = ttk.Scrollbar(txt_frame, command=self._wpt_text.yview)
+        sb.pack(side=tk.RIGHT, fill=tk.Y)
+        self._wpt_text.config(yscrollcommand=sb.set)
+
+        with open(meta_path, "r", encoding="utf-8") as f:
+            self._wpt_text.insert("1.0", f.read())
+
+        query = f"[{subtest_name}]"
+        pos = self._wpt_text.search(query, "1.0", tk.END, exact=True)
+        if pos:
+            exp_pos = self._wpt_text.search("expected:", pos, stopindex=f"{pos} + 5 lines")
+            target = exp_pos if exp_pos else pos
+            self._wpt_text.mark_set(tk.INSERT, target)
+            self._wpt_text.see(target)
+            self._wpt_text.tag_add("search", target + " linestart", target + " lineend")
+            self._wpt_text.tag_config("search", background="#ffff00", foreground="#000000")
+            self._wpt_text.focus_set()
+
+        def save():
+            with open(meta_path, "w", encoding="utf-8") as f:
+                f.write(self._wpt_text.get("1.0", tk.END).strip() + "\n")
+            top.destroy()
+            self.execute_workflow("Save WPT & Diff", lambda: self.run_cmd(["git", "diff", meta_path]))
+
+        ttk.Button(top, text="Save to File", command=save, width=20).pack(pady=(0, 15))
 
 if __name__ == "__main__":
     app = TreeherderTool()
