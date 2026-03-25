@@ -819,6 +819,11 @@ class TreeherderTool(tk.Tk):
                         lightcolor=T["bg3"], darkcolor=T["bg3"], relief="solid", borderwidth=1)
         style.configure("TLabelframe.Label", background=T["bg"], foreground=T["dim_fg"], font=("Helvetica", 10, "bold"))
         style.configure("TButton", background=T["bg3"], foreground=T["fg_btn"])
+        style.configure("TCombobox", fieldbackground=T["bg2"], background=T["bg3"], foreground=T["fg"], arrowcolor=T["fg"])
+        style.map("TCombobox", 
+                  fieldbackground=[("readonly", T["bg2"]), ("disabled", T["bg"])],
+                  foreground=[("readonly", T["fg"]), ("disabled", T["fg_disabled"])])
+        style.map("TButton", background=[("active", T["bg_active"]), ("disabled", T["bg2"])], foreground=[("disabled", T["fg_disabled"])])
         
         # 2. Apply theme to self
         self.configure(bg=T["bg"])
