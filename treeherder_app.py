@@ -513,20 +513,16 @@ class TreeherderTool(tk.Tk):
         # Click effect
         def on_click(e):
             if self.is_running_command: return
-            b.config(relief=tk.SUNKEN)
             cmd()
-            # Reset relief after a short delay
-            if self.winfo_exists():
-                self.after(100, lambda: b.config(relief=tk.FLAT) if b.winfo_exists() else None)
 
         b.bind("<Button-1>", on_click)
         
         # Highlight on hover
         def on_enter(e):
             if not self.is_running_command:
-                b.config(background=T[f"{key_prefix}_hover"])
+                b.config(background=self.T[f"{key_prefix}_hover"])
         def on_leave(e):
-            b.config(background=T[f"{key_prefix}_btn"])
+            b.config(background=self.T[f"{key_prefix}_btn"])
         
         b.bind("<Enter>", on_enter)
         b.bind("<Leave>", on_leave)
