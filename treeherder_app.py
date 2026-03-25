@@ -1067,12 +1067,14 @@ class TreeherderTool(tk.Tk):
                 os.makedirs(os.path.dirname(meta_path), exist_ok=True)
                 with open(meta_path, "w", encoding="utf-8") as f:
                     filename = os.path.basename(test_path)
-                    # Use standard WPT indentation: 0 for root, 2 for subtest, 4 for expected
+                    # Precision WPT Indentation (2rd space increment)
                     f.write(f"[{filename}]\n")
                     if subtest_name and subtest_name != filename:
-                        f.write(f"  [{subtest_name}]\n    expected: \n")
+                        # Root(0) -> Subtest(2) -> Expected(4) -> Conditional(6)
+                        f.write(f"  [{subtest_name}]\n    expected:\n      ")
                     else:
-                        f.write(f"    expected: \n")
+                        # Root(0) -> Expected(2) -> Conditional(4)
+                        f.write(f"  expected:\n    ")
             else:
                 return
 
@@ -1087,11 +1089,25 @@ class TreeherderTool(tk.Tk):
         toolbar.pack(fill=tk.X, padx=10, pady=5)
 
         def insert_text(txt):
-            # Check if we are at the start of a line to handle indentation
+            # Dynamic Relative Indentation
             line_str = self._wpt_text.get("insert linestart", "insert")
-            if not line_str.strip() and not line_str.startswith("    "):
-                # Automatically add 4-space indentation for new properties/conditions
-                self._wpt_text.insert("insert linestart", "    ")
+            if not line_str.strip():
+                # On a fresh line, look back for context
+                prev_text = self._wpt_text.get("1.0", "insert")
+                lines = [l for l in prev_text.split("\n") if l.strip()]
+                if lines:
+                    last_l = lines[-1]
+                    # Calculate parent indentation
+                    p_indent_len = len(last_l) - len(last_l.lstrip())
+                    new_indent_len = p_indent_len
+                    
+                    # If parent was a header, go deeper
+                    if last_l.strip().endswith("expected:") or (last_l.strip().startswith("[") and last_l.strip().endswith("]")):
+                        new_indent_len += 2
+                    
+                    indent_str = " " * new_indent_len
+                    if not line_str.startswith(indent_str):
+                        self._wpt_text.insert("insert linestart", indent_str)
             
             self._wpt_text.insert(tk.INSERT, txt)
 
