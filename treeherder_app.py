@@ -253,10 +253,11 @@ class TreeherderTool(tk.Tk):
 
         style.configure(".", background=T["bg"], foreground=T["fg"])
         
-        # --- FIX: Apply LabelFrame styles on startup ---
-        style.configure("TLabelframe", background=T["bg"], bordercolor=T["bg3"], borderwidth=1)
+        # --- FIX: Explicitly flatten LabelFrame borders on startup ---
+        style.configure("TLabelframe", background=T["bg"], bordercolor=T["bg3"], 
+                        lightcolor=T["bg3"], darkcolor=T["bg3"], relief="solid", borderwidth=1)
         style.configure("TLabelframe.Label", background=T["bg"], foreground=T["dim_fg"], font=("Helvetica", 10, "bold"))
-        # -----------------------------------------------
+        # -------------------------------------------------------------
 
         style.configure(
             "TButton",
@@ -814,17 +815,10 @@ class TreeherderTool(tk.Tk):
         # 1. Update ttk Styles
         style = ttk.Style(self)
         style.configure(".", background=T["bg"], foreground=T["fg"])
-        style.configure("TLabelframe", background=T["bg"], bordercolor=T["bg3"], borderwidth=1)
+        style.configure("TLabelframe", background=T["bg"], bordercolor=T["bg3"], 
+                        lightcolor=T["bg3"], darkcolor=T["bg3"], relief="solid", borderwidth=1)
         style.configure("TLabelframe.Label", background=T["bg"], foreground=T["dim_fg"], font=("Helvetica", 10, "bold"))
         style.configure("TButton", background=T["bg3"], foreground=T["fg_btn"])
-        style.configure("TCombobox", fieldbackground=T["bg2"], background=T["bg3"], foreground=T["fg"], arrowcolor=T["fg"])
-        style.map("TCombobox", 
-                  fieldbackground=[("readonly", T["bg2"]), ("disabled", T["bg"])],
-                  foreground=[("readonly", T["fg"]), ("disabled", T["fg_disabled"])])
-        style.map("TButton", background=[("active", T["bg_active"]), ("disabled", T["bg2"])], foreground=[("disabled", T["fg_disabled"])])
-        
-        style.configure("TLabelframe", background=T["bg"], bordercolor=T["bg3"], borderwidth=1)
-        style.configure("TLabelframe.Label", background=T["bg"], foreground=T["dim_fg"], font=("Helvetica", 10, "bold"))
         
         # 2. Apply theme to self
         self.configure(bg=T["bg"])
