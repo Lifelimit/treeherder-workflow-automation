@@ -380,7 +380,7 @@ class TreeherderTool(tk.Tk):
     # Popup helpers  (main-thread blocking via wait_window)
     # -----------------------------------------------------------------------
 
-    def _make_popup(self, title: str, h: int) -> tk.Toplevel:
+    def _make_popup(self, title: str, h: int, w: int = 460) -> tk.Toplevel:
         T = self.T
         top = tk.Toplevel(self)
         top.title(title)
@@ -388,7 +388,7 @@ class TreeherderTool(tk.Tk):
         top.transient(self)
         top.grab_set()
         top.update_idletasks()
-        w = 460
+        
         x = self.winfo_x() + (self.winfo_width() - w) // 2
         y = self.winfo_y() + (self.winfo_height() - h) // 2
         top.geometry(f"{w}x{h}+{x}+{y}")
@@ -935,9 +935,7 @@ class TreeherderTool(tk.Tk):
         except Exception:
             author_email = ""
 
-        top = self._make_popup("Recent Git Log", 450)
-        # make it a bit wider
-        top.geometry(f"700x450+{top.winfo_x()-100}+{top.winfo_y()}")
+        top = self._make_popup("Recent Git Log", 450, 700)
 
         T = self.T
         top.configure(bg=T["bg"])
