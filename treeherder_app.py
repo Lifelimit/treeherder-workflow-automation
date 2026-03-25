@@ -387,31 +387,31 @@ class TreeherderTool(tk.Tk):
             categories_frame.columnconfigure(i, weight=1, uniform="group1")
 
         # 1. Git & Repo (Left Column, Top)
-        lf_git = ttk.LabelFrame(categories_frame, text=" Git & Repo ", padding=(10, 8))
+        lf_git = tk.LabelFrame(categories_frame, text=" Git & Repo ", bg=T["bg"], fg=T["dim_fg"], font=("Helvetica", 10, "bold"), bd=1, relief="solid", padx=10, pady=8)
         lf_git.grid(row=0, column=0, padx=(0, 5), pady=(0, 10), sticky="new") # Removed rowspan
         for text, cmd, tip in groups[0][1]:
             self._add_colored_btn(lf_git, text, cmd, "git", tip)
 
         # 2. Lando Flow (Middle Column, Top)
-        lf_lando = ttk.LabelFrame(categories_frame, text=" Lando Flow ", padding=(10, 8))
+        lf_lando = tk.LabelFrame(categories_frame, text=" Lando Flow ", bg=T["bg"], fg=T["dim_fg"], font=("Helvetica", 10, "bold"), bd=1, relief="solid", padx=10, pady=8)
         lf_lando.grid(row=0, column=1, padx=5, pady=(0, 10), sticky="new")
         for text, cmd, tip in groups[1][1]:
             self._add_colored_btn(lf_lando, text, cmd, "lando", tip)
 
         # 3. Linting (Right Column, Top)
-        lf_lint = ttk.LabelFrame(categories_frame, text=" Linting ", padding=(10, 8))
+        lf_lint = tk.LabelFrame(categories_frame, text=" Linting ", bg=T["bg"], fg=T["dim_fg"], font=("Helvetica", 10, "bold"), bd=1, relief="solid", padx=10, pady=8)
         lf_lint.grid(row=0, column=2, padx=(5, 0), pady=(0, 10), sticky="new")
         for text, cmd, tip in groups[3][1]:
             self._add_colored_btn(lf_lint, text, cmd, "lint", tip)
 
         # 4. Reverts (Left Column, Bottom) - Shifted to column 0
-        lf_revert = ttk.LabelFrame(categories_frame, text=" Reverts ", padding=(10, 8))
+        lf_revert = tk.LabelFrame(categories_frame, text=" Reverts ", bg=T["bg"], fg=T["dim_fg"], font=("Helvetica", 10, "bold"), bd=1, relief="solid", padx=10, pady=8)
         lf_revert.grid(row=1, column=0, padx=(0, 5), pady=(0, 10), sticky="new")
         for text, cmd, tip in groups[2][1]:
             self._add_colored_btn(lf_revert, text, cmd, "revert", tip)
 
         # 5. WPT Metadata (Middle Column, Bottom) - Shifted to column 1
-        lf_wpt = ttk.LabelFrame(categories_frame, text=" WPT Metadata ", padding=(10, 8))
+        lf_wpt = tk.LabelFrame(categories_frame, text=" WPT Metadata ", bg=T["bg"], fg=T["dim_fg"], font=("Helvetica", 10, "bold"), bd=1, relief="solid", padx=10, pady=8)
         lf_wpt.grid(row=1, column=1, padx=5, pady=(0, 10), sticky="new")
         for text, cmd, tip in groups[4][1]:
             self._add_colored_btn(lf_wpt, text, cmd, "wpt", tip)
@@ -851,7 +851,7 @@ class TreeherderTool(tk.Tk):
                 if isinstance(child, (tk.Frame, tk.LabelFrame)):
                     child.configure(bg=T["bg"])
                     if isinstance(child, tk.LabelFrame):
-                        child.configure(fg=T["fg"])
+                        child.configure(fg=T["dim_fg"], highlightbackground=T["bg3"], highlightcolor=T["bg3"])
                 elif isinstance(child, tk.Label):
                     if child in self.btn_widgets:
                         pass
