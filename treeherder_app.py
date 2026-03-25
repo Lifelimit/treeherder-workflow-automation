@@ -227,20 +227,34 @@ class TreeherderTool(tk.Tk):
                 ("Lando Merge Back", self.do_push_merge_back),
                 ("Lando Push",       self.do_lando_push),
             ]),
-            ("Workflows & WPT", [
+            ("Reverts", [
                 ("Single Revert",    self.do_single_revert),
                 ("Multiple Revert",  self.do_multiple_reverts),
+            ]),
+            ("WPT Metadata", [
                 ("Update WPT",       self.do_update_wpt),
             ])
         ]
 
         self.btn_widgets = []
-        for col_idx, (group_name, cmds) in enumerate(groups):
+        for col_idx, (group_name, cmds) in enumerate(groups[:2]):
             lf = ttk.LabelFrame(categories_frame, text=f" {group_name} ", padding=8)
             lf.grid(row=0, column=col_idx, padx=5, sticky="nsew")
             categories_frame.columnconfigure(col_idx, weight=1)
-            
-            for row_idx, (text, cmd) in enumerate(cmds):
+            for text, cmd in cmds:
+                b = ttk.Button(lf, text=text, command=cmd)
+                b.pack(fill=tk.X, pady=2)
+                self.btn_widgets.append(b)
+        
+        # Column 2: Revert and WPT (stacked vertically)
+        col2 = tk.Frame(categories_frame, bg=T["bg"])
+        col2.grid(row=0, column=2, padx=5, sticky="nsew")
+        categories_frame.columnconfigure(2, weight=1)
+
+        for group_name, cmds in groups[2:]:
+            lf = ttk.LabelFrame(col2, text=f" {group_name} ", padding=8)
+            lf.pack(fill=tk.X, pady=(0, 5))
+            for text, cmd in cmds:
                 b = ttk.Button(lf, text=text, command=cmd)
                 b.pack(fill=tk.X, pady=2)
                 self.btn_widgets.append(b)
