@@ -363,7 +363,7 @@ class TreeherderTool(tk.Tk):
                 ("Lando Merge",      self.do_merge, "Merge specific changesets from the source repository into the target destination."),
                 ("Lando Merge Back", self.do_push_merge_back, "Push a merge back to the integration branch."),
                 ("Lando Push",       self.do_lando_push, "Directly push to the current active branch."),
-                ("Upgrade Lando",    self.do_upgrade_lando, "Run pipx upgrade lando_cli to update the Mozilla Lando CLI."),
+                ("Lando Sync",      self.do_upgrade_lando, "Install or update the Mozilla Lando CLI via pipx."),
             ]),
             ("Reverts", [
                 ("Single Revert",    self.do_single_revert, "Create a revert commit for a single revision."),
@@ -1469,10 +1469,22 @@ class TreeherderTool(tk.Tk):
 
     def do_upgrade_lando(self):
         def logic():
-            self.process_queue.put(("log", "\n> Upgrading Lando CLI via pipx...\n"))
-            self.run_cmd(["pipx", "upgrade", "lando_cli"])
+            self.process_queue.put(("log", "\n> Checking Lando CLI status via pipx...\n"))
+            try:
+                # Check if lando_cli is already managed by pipx
+                out = subprocess.check_output(["pipx", "list"], text=True, stderr=subprocess.DEVNULL)
+                is_installed = "lando_cli" in out or "lando-cli" in out
+            except Exception:
+                is_installed = False
+
+            if is_installed:
+                self.process_queue.put(("log", "> Lando CLI is installed. Upgrading...\n"))
+                self.run_cmd(["pipx", "upgrade", "lando_cli"])
+            else:
+                self.process_queue.put(("log", "> Lando CLI not found. Installing...\n"))
+                self.run_cmd(["pipx", "install", "lando_cli"])
         
-        self.execute_workflow("Upgrade Lando CLI", logic)
+        self.execute_workflow("Install/Upgrade Lando CLI", logic)
 
     def do_view_log(self):
         try:
