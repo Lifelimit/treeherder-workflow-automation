@@ -363,7 +363,6 @@ class TreeherderTool(tk.Tk):
                 ("Lando Merge",      self.do_merge, "Merge specific changesets from the source repository into the target destination."),
                 ("Lando Merge Back", self.do_push_merge_back, "Push a merge back to the integration branch."),
                 ("Lando Push",       self.do_lando_push, "Directly push to the current active branch."),
-                ("Lando Sync",      self.do_upgrade_lando, "Install or update the Mozilla Lando CLI via pipx."),
             ]),
             ("Reverts", [
                 ("Single Revert",    self.do_single_revert, "Create a revert commit for a single revision."),
@@ -377,6 +376,11 @@ class TreeherderTool(tk.Tk):
             ("WPT Metadata", [
                 ("Update WPT",       self.do_update_wpt, "Update WPT metadata for a single test."),
                 ("Batch WPT",        self.do_batch_wpt, "Update WPT metadata for multiple tests from a list."),
+            ]),
+            ("Utilities", [
+                ("Check System",    self.do_check_system, "Scan system for git, lando, pipx, and mach presence."),
+                ("Install pipx",     self.do_install_pipx, "Install pipx via python3 -m pip (for fresh environments)."),
+                ("Lando Sync",       self.do_upgrade_lando, "Install or update the Mozilla Lando CLI via pipx."),
             ])
         ]
 
@@ -418,6 +422,12 @@ class TreeherderTool(tk.Tk):
         lf_wpt.grid(row=1, column=1, padx=5, pady=(0, 10), sticky="new")
         for text, cmd, tip in groups[4][1]:
             self._add_colored_btn(lf_wpt, text, cmd, "wpt", tip)
+
+        # 6. Utilities (Right Column, Bottom)
+        lf_util = tk.LabelFrame(categories_frame, text=" Utilities ", bg=T["bg"], fg=T["dim_fg"], font=("Helvetica", 10, "bold"), bd=1, relief="solid", padx=10, pady=8)
+        lf_util.grid(row=1, column=2, padx=(5, 0), pady=(0, 10), sticky="new")
+        for text, cmd, tip in groups[5][1]:
+            self._add_colored_btn(lf_util, text, cmd, "git", tip)
 
         # ---- Terminal ----
         lbl_frame = tk.Frame(main, bg=T["bg"])
@@ -1485,6 +1495,44 @@ class TreeherderTool(tk.Tk):
                 self.run_cmd(["pipx", "install", "lando_cli"])
         
         self.execute_workflow("Install/Upgrade Lando CLI", logic)
+
+    def do_install_pipx(self):
+        def logic():
+            self.process_queue.put(("log", "\n> Attempting to install pipx via python3 -m pip...\n"))
+            # Standard Mozilla installation path for pipx
+            self.run_cmd([sys.executable, "-m", "pip", "install", "--user", "pipx"])
+            self.run_cmd([sys.executable, "-m", "pipx", "ensurepath"])
+            self.process_queue.put(("log", "\n> pipx installation attempt finished. Please restart the app if commands still fail.\n"))
+        self.execute_workflow("Install pipx", logic)
+
+    def do_check_system(self):
+        def logic():
+            self.process_queue.put(("log", "\n>>> SYSTEM STATUS CHECK <<<\n"))
+            
+            checks = [
+                ("Python3", [sys.executable, "--version"]),
+                ("Git",     ["git", "--version"]),
+                ("pipx",    ["pipx", "--version"]),
+                ("Lando",   ["lando", "--version"]),
+            ]
+            
+            cwd = self._cwd()
+            mach = os.path.join(cwd, "mach")
+            if os.path.exists(mach):
+                checks.append(("Mach (Repo)", [mach, "--version"]))
+            else:
+                self.process_queue.put(("log", "! Mach: NOT FOUND in current repository path.\n"))
+
+            for name, cmd in checks:
+                try:
+                    out = subprocess.check_output(cmd, text=True, stderr=subprocess.STDOUT, env=self._build_env()).strip()
+                    self.process_queue.put(("log", f"✓ {name}: {out}\n"))
+                except Exception:
+                    self.process_queue.put(("log", f"✗ {name}: NOT FOUND or failed to run.\n"))
+            
+            self.process_queue.put(("log", "\n>>> Check Complete.\n"))
+
+        self.execute_workflow("System Check", logic)
 
     def do_view_log(self):
         try:
