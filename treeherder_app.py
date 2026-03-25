@@ -12,6 +12,9 @@ import platform
 import json
 import webbrowser
 import re
+import time
+import datetime
+from typing import Any, Optional, List, Tuple, Union
 
 
 # ---------------------------------------------------------------------------
@@ -55,50 +58,114 @@ def is_dark_mode() -> bool:
 def build_theme(dark: bool) -> dict:
     if dark:
         return dict(
-            bg="#1e1e1e",
-            bg2="#2d2d2d",
-            bg3="#3c3c3c",
-            bg_active="#505050",
-            fg="#d4d4d4",
+            bg="#121212",           # Deeper/Muted background
+            bg2="#1e1e1e",          # Surface color
+            bg3="#333333",
+            bg_active="#3d3d3d",
+            fg="#e0e0e0",           # Off-white for less eye-strain
             fg_btn="#ffffff",
-            fg_disabled="#777777",
+            fg_disabled="#555555",
             term_bg="#000000",
             term_fg="#d4d4d4",
-            err_fg="#ff5555",
-            ok_fg="#55ff55",
-            info_fg="#55ffff",
-            dim_fg="#888888",
-            # Vibrant button colors for dark theme
-            git_btn="#0078d4",  # Office Blue
-            lando_btn="#107c10",  # Office Green
-            revert_btn="#d83b01",  # Office Orange/Red
-            wpt_btn="#5c2d91",  # Office Purple
+            err_fg="#f38ba8",       # Softer red
+            ok_fg="#a6e3a1",        # Softer green
+            info_fg="#89b4fa",       # Softer blue
+            dim_fg="#7f849c",
+            # Professional muted buttons
+            git_btn="#1c5d99",      # Deeper Business Blue
+            git_hover="#164c7e",
+            lando_btn="#1a5d1a",    # Deeper Forest Green
+            lando_hover="#144914",
+            revert_btn="#a42e01",   # Burnt Orange/Red
+            revert_hover="#8a2701",
+            wpt_btn="#452c63",      # Deep Purple
+            wpt_hover="#36224d",
             btn_fg="#ffffff",
-            btn_hover_bg_darker="#005a9e", # Slightly darker for hover
         )
     else:
         return dict(
-            bg="#f0f0f0",
+            bg="#f8f9fa",           # Clean Google-style light bg
             bg2="#ffffff",
-            bg3="#d0d0d0",
-            bg_active="#b0b0b0",
-            fg="#1a1a1a",
-            fg_btn="#1a1a1a",
-            fg_disabled="#999999",
+            bg3="#e9ecef",
+            bg_active="#dee2e6",
+            fg="#212529",
+            fg_btn="#212529",
+            fg_disabled="#adb5bd",
             term_bg="#ffffff",
-            term_fg="#1a1a1a",
-            err_fg="#cc0000",
-            ok_fg="#007700",
-            info_fg="#0055cc",
-            dim_fg="#555555",
-            # Vibrant button colors for light theme
-            git_btn="#0078d4",  # Office Blue
-            lando_btn="#107c10",  # Office Green
-            revert_btn="#d83b01",  # Office Orange/Red
-            wpt_btn="#5c2d91",  # Office Purple
+            term_fg="#212529",
+            err_fg="#dc3545",
+            ok_fg="#28a745",
+            info_fg="#007bff",
+            dim_fg="#6c757d",
+            git_btn="#0078d4",
+            git_hover="#005a9e",
+            lando_btn="#107c10",
+            lando_hover="#0b5a0b",
+            revert_btn="#d83b01",
+            revert_hover="#a42e01",
+            wpt_btn="#5c2d91",
+            wpt_hover="#401e66",
             btn_fg="#ffffff",
-            btn_hover_bg_darker="#005a9e", # Slightly darker for hover
         )
+
+
+# ---------------------------------------------------------------------------
+# Tooltip Helper
+# ---------------------------------------------------------------------------
+
+class Tooltip:
+    """Helper to show hover tooltips for any widget."""
+    def __init__(self, widget, text):
+        self.widget = widget
+        self.text = text
+        self.tip_window: Optional[tk.Toplevel] = None
+        self.id = None
+        self.x = self.y = 0
+        self.widget.bind("<Enter>", self.enter)
+        self.widget.bind("<Leave>", self.leave)
+        self.widget.bind("<ButtonPress>", self.leave)
+
+    def enter(self, event=None):
+        self.schedule()
+
+    def leave(self, event=None):
+        self.unschedule()
+        self.hide_tip()
+
+    def schedule(self):
+        self.unschedule()
+        self.id = self.widget.after(500, self.show_tip)
+
+    def unschedule(self):
+        id_val = self.id
+        self.id = None
+        if id_val:
+            self.widget.after_cancel(id_val)
+
+    def show_tip(self):
+        if not self.widget.winfo_exists(): return
+        x, y, cx, cy = self.widget.bbox("insert")
+        x = self.widget.winfo_rootx() + 20
+        y = self.widget.winfo_rooty() + self.widget.winfo_height() + 5
+        self.tip_window = tw = tk.Toplevel(self.widget)
+        tw.wm_overrideredirect(True)
+        tw.wm_geometry(f"+{x}+{y}")
+        
+        # Determine tooltip theme based on app's current theme (via widget Master)
+        bg = "#333333" if getattr(self.widget.master, "_dark", True) else "#ffffff"
+        fg = "#ffffff" if getattr(self.widget.master, "_dark", True) else "#333333"
+        border = "#555555" if getattr(self.widget.master, "_dark", True) else "#cccccc"
+
+        label = tk.Label(tw, text=self.text, justify=tk.LEFT,
+                         background=bg, foreground=fg, relief=tk.SOLID, borderwidth=1,
+                         font=("Helvetica", 10, "normal"), padx=6, pady=4)
+        label.pack(ipadx=1)
+
+    def hide_tip(self):
+        tw = self.tip_window
+        self.tip_window = None
+        if tw:
+            tw.destroy()
 
 
 # ---------------------------------------------------------------------------
@@ -121,7 +188,7 @@ class TreeherderTool(tk.Tk):
 
         # Pop to front on startup
         self.attributes("-topmost", True)
-        self.after(500, lambda: self.attributes("-topmost", False))
+        self.after(500, lambda: self.attributes("-topmost", False) if self.winfo_exists() else None)
         self.lift()
         self.focus_force()
 
@@ -129,14 +196,48 @@ class TreeherderTool(tk.Tk):
         self.T = build_theme(self._dark)
 
         self.configure(bg=self.T["bg"])
-        self.process_queue = queue.Queue()
+        self.process_queue: queue.Queue[Any] = queue.Queue()
         self.is_running_command = False
+        self.btn_widgets = []
+        
+        # Initialize UI variables and widgets to avoid AttributeError/Lints
+        self.repo_var: tk.StringVar = tk.StringVar()
+        self.branch_var: tk.StringVar = tk.StringVar()
+        self.branch_dropdown: ttk.Combobox = None # type: ignore
+        self.status_var: tk.StringVar = tk.StringVar()
+        self.status_label: tk.Label = None # type: ignore
+        self.terminal: tk.Text = None # type: ignore
+        self.search_var: tk.StringVar = tk.StringVar()
+        self.search_entry: tk.Entry = None # type: ignore
+        self.progress: ttk.Progressbar = None # type: ignore
+        self._popup_result: Any = None
+        self._search_current_idx: str = "1.0"
+        self._wpt_text: tk.Text = None # type: ignore
+        
+        # Feature: Undo Last Workflow
+        self._last_workflow_head: str | None = None
+        
+        # Feature: Status Bar Timer
+        self._workflow_start_time: float | None = None
+        self._timer_label: tk.Label = None # type: ignore
+        self._timer_after_id: str | None = None
+        
+        # Feature: Recent Hashes
+        self._recent_hashes: list[str] = []
+        
+        # Feature: Theme toggle
+        self._theme_toggle_label: tk.Label = None # type: ignore
+
+        # Load persistent config
+        self._load_config()
 
         self.setup_ui()
         self.check_queue()
         # Check for stuck git state a moment after the window is ready
-        self.after(500, self._startup_git_check)
-        self.after(600, self._update_git_status)
+        self.after(500, self._startup_git_check) # type: ignore
+        self.after(600, self._update_git_status) # type: ignore
+        # Feature: Auto-fetch on startup
+        self.after(700, self._auto_fetch) # type: ignore
 
     def setup_ui(self):
         T = self.T
@@ -176,7 +277,7 @@ class TreeherderTool(tk.Tk):
 
         default_repo = os.environ.get("TREEHERDER_TEST_REPO") or self._load_repo_path() or os.getcwd()
         self.repo_var = tk.StringVar(value=default_repo)
-        self.repo_var.trace_add("write", lambda *args: self._save_repo_path(self.repo_var.get()))
+        self.repo_var.trace_add("write", lambda n, i, m: self._save_repo_path(self.repo_var.get()))
 
         tk.Entry(top, textvariable=self.repo_var, bg=T["bg2"], fg=T["fg"],
                  insertbackground=T["fg"], font=("Helvetica", 11),
@@ -188,7 +289,9 @@ class TreeherderTool(tk.Tk):
             if d:
                 self.repo_var.set(d)
 
-        ttk.Button(top, text="Browse…", command=browse_repo).pack(side=tk.LEFT, padx=(0, 20))
+        browse_btn = ttk.Button(top, text="Browse…", command=browse_repo)
+        browse_btn.pack(side=tk.LEFT, padx=(0, 20))
+        Tooltip(browse_btn, "Select the Firefox repository root directory.")
 
         tk.Label(top, text="Active Branch:", bg=T["bg"], fg=T["fg"],
                  font=("Helvetica", 11)).pack(side=tk.LEFT, padx=(0, 8))
@@ -211,6 +314,7 @@ class TreeherderTool(tk.Tk):
         )
         self.branch_dropdown.pack(side=tk.LEFT, padx=8)
         self.branch_dropdown.bind("<<ComboboxSelected>>", self.on_branch_change)
+        Tooltip(self.branch_dropdown, "Select the active local branch to target.")
         
         # Disable accidental mouse scroll
         def disable_scroll(event):
@@ -223,6 +327,14 @@ class TreeherderTool(tk.Tk):
         self.status_label = tk.Label(top, textvariable=self.status_var, bg=T["bg"], fg=T["dim_fg"], font=("Helvetica", 11, "bold"))
         self.status_label.pack(side=tk.LEFT, padx=12)
 
+        # Feature: Dark/Light mode toggle
+        toggle_text = "☀️ Light" if self._dark else "🌙 Dark"
+        self._theme_toggle_label = tk.Label(top, text=toggle_text, bg=T["bg3"], fg=T["fg"],
+                                            font=("Helvetica", 10, "bold"), padx=8, pady=2, cursor="hand2", relief=tk.FLAT)
+        self._theme_toggle_label.pack(side=tk.RIGHT, padx=4)
+        self._theme_toggle_label.bind("<Button-1>", lambda e: self._toggle_theme())
+        Tooltip(self._theme_toggle_label, "Switch between Dark and Light mode (CMD+D).")
+
         # ---- Action Category Frames ----
         categories_frame = tk.Frame(main, bg=T["bg"])
         categories_frame.pack(fill=tk.X, pady=(0, 15))
@@ -230,38 +342,40 @@ class TreeherderTool(tk.Tk):
         # Define categorized button groups
         groups = [
             ("Git & Repo", [
-                ("Git Fetch",      self.do_fetch),
-                ("Git Pull",       self.do_pull),
-                ("Git Hard Reset", self.do_hard_reset),
-                ("View Git Log",   self.do_view_log),
+                ("Git Fetch",      self.do_fetch, "Download objects and refs from another repository."),
+                ("Git Pull",       self.do_pull, "Fetch from and integrate with another repository or a local branch."),
+                ("Git Hard Reset", self.do_hard_reset, "Reset current HEAD (WARNING: discards local changes)."),
+                ("Revert Last Action", self.do_undo_last, "Revert the most recent repository change using git reflog."),
+                ("View Git Log",   self.do_view_log, "Show commit logs for the current branch."),
             ]),
             ("Lando Flow", [
-                ("Cherry-Pick",      self.do_cherry_pick),
-                ("Lando Merge",      self.do_merge),
-                ("Lando Merge Back", self.do_push_merge_back),
-                ("Lando Push",       self.do_lando_push),
+                ("Cherry-Pick",      self.do_cherry_pick, "Apply changes introduced by some existing commits."),
+                ("Lando Merge",      self.do_merge, "Merge specific changesets from the source repository into the target destination."),
+                ("Lando Merge Back", self.do_push_merge_back, "Push a merge back to the integration branch."),
+                ("Lando Push",       self.do_lando_push, "Directly push to the current active branch."),
             ]),
             ("Reverts", [
-                ("Single Revert",    self.do_single_revert),
-                ("Multiple Revert",  self.do_multiple_reverts),
+                ("Single Revert",    self.do_single_revert, "Create a revert commit for a single revision."),
+                ("Multiple Revert",  self.do_multiple_reverts, "Create revert commits for a range of revisions."),
             ]),
             ("WPT Metadata", [
-                ("Update WPT",       self.do_update_wpt),
+                ("Update WPT",       self.do_update_wpt, "Update WPT metadata for a single test."),
+                ("Batch WPT",        self.do_batch_wpt, "Update WPT metadata for multiple tests from a list."),
             ])
         ]
 
         self.btn_widgets = []
         # Column 0 & 1: Standard Groups
-        for col_idx, (group_name, cmds) in enumerate(groups[:2]):
+        for col_idx, (group_name, cmds) in enumerate(groups[:2]): # type: ignore
             lf = ttk.LabelFrame(categories_frame, text=f" {group_name} ", padding=8)
             lf.grid(row=0, column=col_idx, padx=5, sticky="nsew")
             categories_frame.columnconfigure(col_idx, weight=1)
             
-            # Map group name to color
-            color = T["git_btn"] if "Git" in group_name else T["lando_btn"]
+            # Map group name to color key prefix
+            prefix = "git" if "Git" in group_name else "lando"
             
-            for text, cmd in cmds:
-                self._add_colored_btn(lf, text, cmd, color)
+            for text, cmd, tip in cmds:
+                self._add_colored_btn(lf, text, cmd, prefix, tip)
         
         # Column 2: Revert and WPT (stacked vertically)
         col2 = tk.Frame(categories_frame, bg=T["bg"])
@@ -269,28 +383,40 @@ class TreeherderTool(tk.Tk):
         categories_frame.columnconfigure(2, weight=1)
         categories_frame.rowconfigure(0, weight=1)
 
-        for r_idx, (group_name, cmds) in enumerate(groups[2:]):
+        for r_idx, (group_name, cmds) in enumerate(groups[2:]): # type: ignore
             lf = ttk.LabelFrame(col2, text=f" {group_name} ", padding=8)
             lf.grid(row=r_idx, column=0, padx=0, pady=(0, 5), sticky="new")
             col2.columnconfigure(0, weight=1)
             
-            color = T["revert_btn"] if "Revert" in group_name else T["wpt_btn"]
+            prefix = "revert" if "Revert" in group_name else "wpt"
             
-            for text, cmd in cmds:
-                self._add_colored_btn(lf, text, cmd, color)
+            for text, cmd, tip in cmds:
+                self._add_colored_btn(lf, text, cmd, prefix, tip)
 
         # ---- Terminal ----
         lbl_frame = tk.Frame(main, bg=T["bg"])
         lbl_frame.pack(fill=tk.X, pady=(6, 4))
         tk.Label(lbl_frame, text="Terminal Output:", bg=T["bg"], fg=T["fg"],
                  font=("Helvetica", 11, "bold")).pack(side=tk.LEFT)
+
+        # Feature: Timer label (hidden by default)
+        self._timer_label = tk.Label(lbl_frame, text="", bg=T["bg"], fg=T["info_fg"],
+                                      font=("Helvetica", 10, "bold"))
+        self._timer_label.pack(side=tk.LEFT, padx=12)
                  
         def clear_terminal():
             self.terminal.config(state=tk.NORMAL)
             self.terminal.delete("1.0", tk.END)
             self.terminal.config(state=tk.DISABLED)
 
-        ttk.Button(lbl_frame, text="Clear", command=clear_terminal).pack(side=tk.RIGHT, padx=(8, 0))
+        clear_btn = ttk.Button(lbl_frame, text="Clear", command=clear_terminal)
+        clear_btn.pack(side=tk.RIGHT, padx=(8, 0))
+        Tooltip(clear_btn, "Clear the terminal output.")
+
+        # Feature: Save Log button
+        export_btn = ttk.Button(lbl_frame, text="Save Log", command=self.do_export_terminal)
+        export_btn.pack(side=tk.RIGHT, padx=(4, 0))
+        Tooltip(export_btn, "Export the current terminal output to a .log file.")
 
         self.progress = ttk.Progressbar(lbl_frame, mode="indeterminate", length=120)
         # We will pack it dynamically when running, or just leave it hidden
@@ -333,39 +459,66 @@ class TreeherderTool(tk.Tk):
                                      insertbackground=T["fg"], font=("Helvetica", 10), relief=tk.FLAT, width=30)
         self.search_entry.pack(side=tk.LEFT, padx=8, ipady=2)
         self.search_entry.bind("<Return>", lambda e: self._search_terminal())
+        Tooltip(self.search_entry, "Enter text to search in terminal and press Enter.")
         
-        ttk.Button(search_f, text="Find", command=self._search_terminal, width=8).pack(side=tk.LEFT)
-        ttk.Button(search_f, text="Next", command=lambda: self._search_terminal(forward=True), width=8).pack(side=tk.LEFT, padx=4)
+        find_btn = ttk.Button(search_f, text="Find", command=self._search_terminal, width=8)
+        find_btn.pack(side=tk.LEFT)
+        Tooltip(find_btn, "Search for text in the terminal output (CMD+F).")
+
+        next_btn = ttk.Button(search_f, text="Next", command=lambda: self._search_terminal(forward=True), width=8)
+        next_btn.pack(side=tk.LEFT, padx=4)
+        Tooltip(next_btn, "Find the next occurrence of the search term.")
+
+        # Feature: Cross-platform keyboard shortcuts
+        mod = "Command" if platform.system() == "Darwin" else "Control"
+        self.bind(f"<{mod}-f>", lambda e: (self.search_entry.focus_set(), self.search_entry.select_range(0, tk.END)))
+        self.bind(f"<{mod}-l>", lambda e: self.do_view_log())
+        self.bind(f"<{mod}-u>", lambda e: self.do_undo_last())
+        self.bind(f"<{mod}-e>", lambda e: self.do_export_terminal())
+        self.bind(f"<{mod}-d>", lambda e: self._toggle_theme())
 
     # -----------------------------------------------------------------------
     # Queue / UI helpers
     # -----------------------------------------------------------------------
 
-    def _add_colored_btn(self, parent, text, cmd, bg_color):
+    def _add_colored_btn(self, parent, text, cmd, key_prefix, tooltip_text=None):
         T = self.T
-        b = tk.Button(parent, text=text, command=cmd, 
-                      bg=bg_color, fg=T["btn_fg"], 
-                      activebackground=bg_color, activeforeground=T["btn_fg"],
-                      font=("Helvetica", 10, "bold"),
-                      relief=tk.FLAT, pady=6, cursor="hand2")
-        b.pack(fill=tk.X, pady=2)
+        # Using a Label provides 100% control over color on macOS.
+        b = tk.Label(parent, text=text, bg=T[f"{key_prefix}_btn"], fg=T["btn_fg"],
+                     font=("Helvetica", 11, "bold"),
+                     padx=10, pady=8, cursor="hand2", relief=tk.FLAT)
+        b.pack(fill=tk.X, pady=3)
         
-        # Simple highlight on hover
-        def on_enter(e): b.config(background=T["btn_hover_bg_darker"])
-        def on_leave(e): b.config(background=bg_color)
+        # Click effect
+        def on_click(e):
+            if self.is_running_command: return
+            b.config(relief=tk.SUNKEN)
+            cmd()
+            # Reset relief after a short delay
+            if self.winfo_exists():
+                self.after(100, lambda: b.config(relief=tk.FLAT) if b.winfo_exists() else None)
+
+        b.bind("<Button-1>", on_click)
+        
+        # Highlight on hover
+        def on_enter(e):
+            if not self.is_running_command:
+                b.config(background=T[f"{key_prefix}_hover"])
+        def on_leave(e):
+            b.config(background=T[f"{key_prefix}_btn"])
         
         b.bind("<Enter>", on_enter)
         b.bind("<Leave>", on_leave)
-
-        # On macOS, standard tk.Button doesn't show background color well 
-        # unless you use highlightbackground or a specific wrapper.
-        if platform.system() == "Darwin":
-            b.config(highlightbackground=T["bg"], borderwidth=0)
-
+        
+        b.key_prefix = key_prefix # type: ignore
         self.btn_widgets.append(b)
+        
+        if tooltip_text:
+            Tooltip(b, tooltip_text)
 
     def _startup_git_check(self):
         """Run once at startup: warn user if repo has an in-progress git operation."""
+        if not self.winfo_exists(): return
         state = self.detect_git_state()
         if state:
             banner = (
@@ -411,9 +564,11 @@ class TreeherderTool(tk.Tk):
                     self._update_git_status()
         except queue.Empty:
             pass
-        self.after(100, self.check_queue)
+        if self.winfo_exists():
+            self.after(100, self.check_queue)
 
     def set_buttons_state(self, state):
+        if not self.winfo_exists(): return
         for b in self.btn_widgets:
             b.config(state=state)
 
@@ -452,6 +607,7 @@ class TreeherderTool(tk.Tk):
         ttk.Button(f, text="Cancel", command=on_cancel, width=10).pack(side=tk.LEFT, padx=8)
 
     def ask_input(self, title: str, prompt: str) -> str | None:
+        """Original ask_input (without history dropdown)."""
         top = self._make_popup(title, 180)
         e = self._entry(top, prompt)
         e.focus_set()
@@ -491,7 +647,8 @@ class TreeherderTool(tk.Tk):
         self._popup_result = None
 
         def ok(ev=None):
-            v1, v2 = e1.get().strip(), e2.get().strip()
+            v1 = e1.get().strip()
+            v2 = e2.get().strip()
             self._popup_result = (v1, v2) if (v1 and v2) else None
             top.destroy()
 
@@ -505,6 +662,53 @@ class TreeherderTool(tk.Tk):
         self.wait_window(top)
         return self._popup_result
 
+    def ask_input_with_history(self, title: str, prompt: str) -> str | None:
+        """ask_input but displaying deduplicated _recent_hashes as clickable buttons below."""
+        # Taller if we have history
+        h_height = min(180 + (min(len(self._recent_hashes), 5) * 35), 380)
+        top = self._make_popup(title, h_height, 460)
+        e = self._entry(top, prompt)
+        e.focus_set()
+        
+        self._popup_result = None
+
+        def ok(ev=None):
+            v = e.get().strip()
+            self._popup_result = v if v else None
+            top.destroy()
+
+        def cancel(ev=None):
+            top.destroy()
+
+        self._ok_cancel(top, ok, cancel)
+        
+        # Inject History Panel
+        if self._recent_hashes:
+            hist_frame = tk.Frame(top, bg=self.T["bg"])
+            hist_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=(0, 10))
+            tk.Label(hist_frame, text="Recent Hashes:", bg=self.T["bg"], fg=self.T["dim_fg"], font=("Helvetica", 10)).pack(anchor=tk.W)
+            
+            # Show up to 5 recently used
+            recent_display = list(self._recent_hashes)[:5] # type: ignore
+            for h in recent_display:
+                def set_val(val=h):
+                    e.delete(0, tk.END)
+                    e.insert(0, val)
+                    ok()
+                # A flatter button style for history items
+                btn = tk.Label(hist_frame, text=h, bg=self.T["bg2"], fg=self.T["fg"], 
+                               font=("Consolas", 10), cursor="hand2", padx=6, pady=4, relief=tk.FLAT)
+                btn.pack(fill=tk.X, pady=2)
+                btn.bind("<Button-1>", lambda e, v=h: set_val(v))
+                btn.bind("<Enter>", lambda ev, b=btn: b.config(bg=self.T["bg3"]))
+                btn.bind("<Leave>", lambda ev, b=btn: b.config(bg=self.T["bg2"]))
+
+        top.bind("<Return>", ok)
+        top.bind("<Escape>", cancel)
+        top.protocol("WM_DELETE_WINDOW", cancel)
+        self.wait_window(top)
+        return self._popup_result
+
     # -----------------------------------------------------------------------
     # Subprocess/State helpers
     # -----------------------------------------------------------------------
@@ -512,26 +716,183 @@ class TreeherderTool(tk.Tk):
     def _get_config_path(self) -> str:
         return os.path.expanduser("~/.treeherder_app.json")
 
-    def _load_repo_path(self) -> str | None:
+    def _load_config(self):
+        """Load persistent config: repo_path, recent_hashes, dark_mode."""
         conf = self._get_config_path()
         if os.path.exists(conf):
             try:
                 with open(conf, "r") as f:
-                    return json.load(f).get("repo_path")
+                    data = json.load(f)
+                    saved_repo = data.get("repo_path")
+                    if saved_repo:
+                        self.repo_var.set(saved_repo)
+                    saved_hashes = data.get("recent_hashes", [])
+                    self._recent_hashes = list(saved_hashes)[:10] # type: ignore
+                    saved_dark = data.get("dark_mode")
+                    if saved_dark is not None:
+                        self._dark = saved_dark
+                        self.T = build_theme(self._dark)
             except Exception:
                 pass
-        return None
 
-    def _save_repo_path(self, path: str):
-        if not path: return
+    def _save_config(self):
+        """Persist config to disk."""
         try:
+            data = {
+                "repo_path": self.repo_var.get(),
+                "recent_hashes": list(self._recent_hashes)[:10], # type: ignore
+                "dark_mode": self._dark,
+            }
             with open(self._get_config_path(), "w") as f:
-                json.dump({"repo_path": path}, f)
+                json.dump(data, f, indent=2)
         except Exception:
             pass
 
+    def _load_repo_path(self) -> str | None:
+        return None  # Deferred to _load_config
+
+    def _save_repo_path(self, path: str):
+        if not path: return
+        self._save_config()
+
+    def _remember_hash(self, h: str):
+        """Add a hash to the recent hashes list (deduplicated, max 10)."""
+        for part in h.replace(",", " ").split():
+            part = part.strip()
+            if part and len(part) >= 6:
+                if part in self._recent_hashes:
+                    self._recent_hashes.remove(part)
+                self._recent_hashes.insert(0, part)
+        self._recent_hashes = list(self._recent_hashes)[:10] # type: ignore
+        self._save_config()
+
+    def _auto_fetch(self):
+        """Feature: Background auto-fetch on app startup."""
+        if not self.winfo_exists(): return
+        if not self._cwd() or not os.path.exists(os.path.join(self._cwd(), ".git")):
+            return
+        
+        def worker():
+            try:
+                subprocess.run(["git", "fetch", "--quiet"], cwd=self._cwd(), check=True)
+                # Once fetch finishes in background, refresh status gently
+                self.after(0, self._update_git_status)
+            except Exception:
+                pass
+        
+        threading.Thread(target=worker, daemon=True).start()
+
+    def _soft_toggle_theme(self):
+        """Feature: Soft theme switch without full app restart."""
+        self._dark = not self._dark
+        self._save_config()
+        self.T = build_theme(self._dark)
+        T = self.T
+
+        # 1. Update ttk Styles
+        style = ttk.Style(self)
+        style.configure(".", background=T["bg"], foreground=T["fg"])
+        style.configure("TButton", background=T["bg3"], foreground=T["fg_btn"])
+        style.configure("TCombobox", fieldbackground=T["bg2"], background=T["bg3"], foreground=T["fg"], arrowcolor=T["fg"])
+        style.map("TCombobox", 
+                  fieldbackground=[("readonly", T["bg2"]), ("disabled", T["bg"])],
+                  foreground=[("readonly", T["fg"]), ("disabled", T["fg_disabled"])])
+        style.map("TButton", background=[("active", T["bg_active"]), ("disabled", T["bg2"])], foreground=[("disabled", T["fg_disabled"])])
+        
+        # 2. Apply theme to self
+        self.configure(bg=T["bg"])
+        
+        # 3. Apply theme to custom action buttons
+        for b in self.btn_widgets:
+            prefix = getattr(b, "key_prefix", "git")
+            b.config(bg=T[f"{prefix}_btn"], fg=T["btn_fg"])
+
+        # 4. Apply theme to all widgets recursively
+        self._apply_theme_to_widgets(self)
+        
+        # 5. Manually update the toggle label
+        toggle_text = "☀️ Light" if self._dark else "🌙 Dark"
+        self._theme_toggle_label.config(text=toggle_text, bg=T["bg3"], fg=T["fg"])
+        
+        # 6. Re-apply status colors
+        self._update_git_status()
+
+    def _apply_theme_to_widgets(self, root):
+        T = self.T
+        for child in root.winfo_children():
+            try:
+                # 1. Update colors
+                if isinstance(child, (tk.Frame, tk.LabelFrame)):
+                    child.configure(bg=T["bg"])
+                    if isinstance(child, tk.LabelFrame):
+                        child.configure(fg=T["fg"])
+                elif isinstance(child, tk.Label):
+                    if child in self.btn_widgets:
+                        pass
+                    elif child == getattr(self, "status_label", None):
+                         child.configure(bg=T["bg"], fg=T["fg"])
+                    else:
+                        child.configure(bg=T["bg"], fg=T["fg"])
+                elif isinstance(child, (tk.Entry, tk.Text, tk.Listbox)):
+                    if isinstance(child, tk.Listbox):
+                         child.configure(bg=T["bg2"], fg=T["fg"])
+                    elif child == getattr(self, "terminal", None):
+                        child.configure(bg=T["term_bg"], fg=T["term_fg"], 
+                                        insertbackground=T["fg"], highlightcolor=T["git_btn"])
+                    else:
+                        child.configure(bg=T["bg2"], fg=T["fg"], insertbackground=T["fg"])
+                elif isinstance(child, tk.Canvas):
+                    child.configure(bg=T["bg"], highlightthickness=0)
+                elif isinstance(child, ttk.Combobox):
+                    child.configure(style="TCombobox")
+                
+                # 2. ALWAYS recurse into children if they exist
+                if child.winfo_children(): # type: ignore
+                    self._apply_theme_to_widgets(child)
+            except:
+                pass
+
+    def _toggle_theme(self):
+        """Feature: One-click Dark/Light Theme Switcher."""
+        # Use soft reload to avoid background crashes
+        self._soft_toggle_theme()
+
+    def _start_timer(self):
+        if not self.winfo_exists(): return
+        self._workflow_start_time = time.time()
+        self._timer_label.config(text="⏱ 00:00")
+        self._update_timer()
+
+    def _update_timer(self):
+        if not self.winfo_exists():
+            return
+        start = self._workflow_start_time
+        if start is None:
+            return
+        elapsed = int(time.time() - float(start))
+        mins, secs = divmod(elapsed, 60)
+        self._timer_label.config(text=f"⏱ {mins:02d}:{secs:02d}")
+        if self.is_running_command:
+            self._timer_after_id = self.after(1000, self._update_timer) # type: ignore
+
+    def _stop_timer(self):
+        tid = self._timer_after_id
+        if tid:
+            self.after_cancel(tid)
+            self._timer_after_id = None
+        
+        start = self._workflow_start_time
+        if start:
+            # Leave the final time string visible for a few seconds as feedback
+            elapsed = int(time.time() - float(start))
+            mins, secs = divmod(elapsed, 60)
+            self._timer_label.config(text=f"⏱ {mins:02d}:{secs:02d} (Done!)")
+            self._workflow_start_time = None
+            self.after(4000, lambda: self._timer_label.config(text="") if not self.is_running_command else None) # type: ignore
+
     def _update_git_status(self):
         """Update the UI Status label to show ahead/behind/state."""
+        if not self.winfo_exists(): return
         branch = self.branch_var.get()
         cwd = self._cwd()
         if not os.path.exists(os.path.join(cwd, ".git")):
@@ -609,14 +970,15 @@ class TreeherderTool(tk.Tk):
         proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.PIPE,
                                 text=True, env=env, cwd=cwd)
         is_interactive = cmd and cmd[0] == "lando"
-        buf = ""
+        buf: str = ""
         while True:
-            c = proc.stdout.read(1)
+            if not proc.stdout: break
+            c: str = proc.stdout.read(1) # type: ignore
             if not c and proc.poll() is not None:
                 if buf: self.process_queue.put(("log", buf))
                 break
             if c:
-                buf += c
+                buf += c # type: ignore
                 if c == '\n':
                     self.process_queue.put(("log", buf))
                     buf = ""
@@ -658,6 +1020,15 @@ class TreeherderTool(tk.Tk):
         self.set_buttons_state(tk.DISABLED)
         self.progress.pack(side=tk.RIGHT, padx=10)
         self.progress.start(15)
+        self._start_timer()
+        
+        # Feature: Save HEAD before workflow for undo
+        try:
+            self._last_workflow_head = subprocess.check_output(
+                ["git", "rev-parse", "HEAD"], cwd=self._cwd(), text=True, stderr=subprocess.DEVNULL
+            ).strip()
+        except Exception:
+            self._last_workflow_head = None
 
         def worker():
             try:
@@ -673,6 +1044,7 @@ class TreeherderTool(tk.Tk):
                 self.process_queue.put(("alert", str(e)))
             finally:
                 self.process_queue.put(("done", None))
+                self.after(0, self._stop_timer)
 
         threading.Thread(target=worker, daemon=True).start()
 
@@ -695,6 +1067,8 @@ class TreeherderTool(tk.Tk):
             return "cherry-pick"
         if os.path.exists(os.path.join(git_dir, "MERGE_HEAD")):
             return "merge"
+        if os.path.isdir(os.path.join(git_dir, "rebase-merge")) or os.path.isdir(os.path.join(git_dir, "rebase-apply")):
+            return "rebase"
         return None
 
     def show_recovery_dialog(self, state: str, then_run):
@@ -702,10 +1076,12 @@ class TreeherderTool(tk.Tk):
         T = self.T
         abort_cmd  = {"revert": ["git", "revert", "--quit"],
                       "cherry-pick": ["git", "cherry-pick", "--abort"],
-                      "merge": ["git", "merge", "--abort"]}.get(state, [])
+                      "merge": ["git", "merge", "--abort"],
+                      "rebase": ["git", "rebase", "--abort"]}.get(state, [])
         cont_cmd   = {"revert": ["git", "revert", "--continue"],
                       "cherry-pick": ["git", "cherry-pick", "--continue"],
-                      "merge": ["git", "merge", "--continue"]}.get(state, [])
+                      "merge": ["git", "merge", "--continue"],
+                      "rebase": ["git", "rebase", "--continue"]}.get(state, [])
 
         top = self._make_popup(f"⚠ In-Progress {state.title()} Detected", 210)
         tk.Label(top,
@@ -754,7 +1130,7 @@ class TreeherderTool(tk.Tk):
                 cwd=self._cwd(), text=True, stderr=subprocess.DEVNULL
             ).strip()
             if branch == current:
-                self.process_queue.put(("dim", f"\n> Already on '{branch}'. Skipping switch.\n"))
+                self.process_queue.put(("log", f"\n> Already on '{branch}'. Skipping switch.\n"))
                 return
         except Exception:
             pass
@@ -799,9 +1175,85 @@ class TreeherderTool(tk.Tk):
 
         self.execute_workflow(f"Git Hard Reset (HEAD~{n})", logic)
 
+    def do_undo_last(self):
+        """Feature: Recover from an accidental workflow step via reflog tracking."""
+        if not self._last_workflow_head:
+            messagebox.showinfo("Undo", "No previous workflow HEAD tracked in this session.")
+            return
+            
+        def logic():
+            self.run_cmd(["git", "reset", "--hard", self._last_workflow_head])
+            
+        self.execute_workflow("Undo Last Workflow", logic)
+
+    def do_view_log(self):
+        top = self._make_popup("Git Log (Last 50)", 500, 700)
+        T = self.T
+        
+        top_frame = tk.Frame(top, bg=T["bg"])
+        top_frame.pack(fill=tk.X, padx=10, pady=5)
+        
+        tk.Label(top_frame, text="Double-click a line to copy hash to clipboard", 
+                 bg=T["bg"], fg=T["dim_fg"], font=("Helvetica", 10)).pack(side=tk.LEFT)
+        
+        list_frame = tk.Frame(top, bg=T["bg"])
+        list_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
+        
+        sb = ttk.Scrollbar(list_frame)
+        sb.pack(side=tk.RIGHT, fill=tk.Y)
+        
+        listbox = tk.Listbox(list_frame, bg=T["bg2"], fg=T["fg"], font=("Consolas", 10),
+                             yscrollcommand=sb.set, relief=tk.FLAT, highlightthickness=0)
+        listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        sb.config(command=listbox.yview)
+
+        author_email = ""
+        try:
+            author_email = subprocess.check_output(["git", "config", "user.email"], 
+                                                   cwd=self._cwd(), text=True, stderr=subprocess.DEVNULL).strip()
+        except: pass
+        
+        only_me_var = tk.BooleanVar(value=False)
+
+        def refresh_log():
+            listbox.delete(0, tk.END)
+            cmd = ["git", "log", "-n", "50", "--oneline"]
+            if only_me_var.get() and author_email:
+                cmd.append(f"--author={author_email}")
+            
+            try:
+                out = subprocess.check_output(cmd, cwd=self._cwd(), text=True, stderr=subprocess.DEVNULL)
+                for line in out.splitlines():
+                    if line.strip():
+                        listbox.insert(tk.END, f" {line.strip()}")
+            except subprocess.CalledProcessError:
+                listbox.insert(tk.END, " Failed to fetch git log.")
+
+        if author_email:
+            chk = tk.Checkbutton(top_frame, text="Show only my commits", variable=only_me_var, 
+                                 command=refresh_log, bg=T["bg"], fg=T["fg"], selectcolor=T["bg2"], activebackground=T["bg"])
+            chk.pack(side=tk.RIGHT)
+
+        def on_double_click(event):
+            sel = listbox.curselection()
+            if not sel: return
+            line = listbox.get(sel[0]).strip()
+            if not line: return
+            hash_val = line.split(" ", 1)[0]
+            # Strip decorator brackets if they accidentally click a ref
+            hash_val = hash_val.replace("(", "").replace(")", "")
+            self.clipboard_clear()
+            self.clipboard_append(hash_val)
+            messagebox.showinfo("Copied!", f"Hash '{hash_val}' copied to clipboard!", parent=top)
+
+        listbox.bind("<Double-1>", on_double_click)
+        refresh_log()
+
     def do_single_revert(self):
-        h = self.ask_input("Single Revert", "Changeset hash to revert:")
-        if not h: return
+        _h = self.ask_input_with_history("Single Revert", "Changeset hash to revert:")
+        if not _h: return
+        h: str = _h
+        self._remember_hash(h)
         reason = self.ask_input("Revert Reason", "Revert reason (e.g. 'for causing bustages'):")
         if not reason: return
 
@@ -928,12 +1380,14 @@ class TreeherderTool(tk.Tk):
         ]))
 
     def do_cherry_pick(self):
-        h = self.ask_input("Cherry-Pick", "Changeset hash(es) to cherry-pick:")
+        h = self.ask_input_with_history("Cherry-Pick", "Changeset hash(es) to cherry-pick:")
         if not h: return
+        self._remember_hash(h)
 
         def logic():
             self.run_cmd(["git", "pull"])
-            hashes = h.replace(",", " ").split()
+            _h: str = h # type: ignore
+            hashes = _h.replace(",", " ").split()
             self.run_cmd(["git", "cherry-pick"] + hashes)
             
             final_msg = self.get_output(["git", "log", "-1", "--pretty=%B"])
@@ -980,7 +1434,6 @@ class TreeherderTool(tk.Tk):
 
         T = self.T
         top.configure(bg=T["bg"])
-        top.transient(self)
 
         top_frame = tk.Frame(top, bg=T["bg"])
         top_frame.pack(fill=tk.X, padx=10, pady=10)
@@ -1027,14 +1480,27 @@ class TreeherderTool(tk.Tk):
         listbox.bind("<Double-1>", on_double_click)
         refresh_log()
 
+    def do_export_terminal(self):
+        """Feature: Fast terminal log export."""
+        text = self.terminal.get("1.0", tk.END)
+        # Suggest a timestamped filename in Desktop
+        filename = f"treeherder_log_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        desktop = os.path.expanduser("~/Desktop")
+        filepath = os.path.join(desktop, filename)
+        try:
+            with open(filepath, "w", encoding="utf-8") as f:
+                f.write(text)
+            messagebox.showinfo("Export Successful", f"Log saved to:\n{filepath}")
+        except Exception as e:
+            messagebox.showerror("Error", f"Failed to save log:\n{e}")
+
     def _linkify_terminal(self):
-        """Scan the terminal for Phabricator Revisions (D123) and Bug IDs."""
+        """Scan only the last inserted line for Phabricator Revisions (D123), Bug IDs, and URLs."""
         self.terminal.config(state=tk.NORMAL)
-        # Search for patterns like D12345 or Bug 123456
-        content = self.terminal.get("1.0", tk.END)
-        
-        # Clear existing link tags first
-        self.terminal.tag_remove("link", "1.0", tk.END)
+        # Only scan the last line to avoid O(n²) re-scanning of the full buffer
+        last_line_idx = self.terminal.index("end-2l linestart")
+        last_line_end = self.terminal.index("end-1c")
+        content = self.terminal.get(last_line_idx, last_line_end)
 
         patterns = [
             r"\bD\d{5,}\b",           # Phabricator Revision: D12345
@@ -1044,8 +1510,8 @@ class TreeherderTool(tk.Tk):
 
         for p in patterns:
             for m in re.finditer(p, content, re.IGNORECASE):
-                start = f"1.0 + {m.start()} chars"
-                end = f"1.0 + {m.end()} chars"
+                start = f"{last_line_idx} + {m.start()} chars"
+                end = f"{last_line_idx} + {m.end()} chars"
                 self.terminal.tag_add("link", start, end)
         
         self.terminal.config(state=tk.DISABLED)
@@ -1054,16 +1520,17 @@ class TreeherderTool(tk.Tk):
         """Handle clicking a link tag."""
         idx = self.terminal.index(f"@{event.x},{event.y}")
         # Get start and end of the tag
-        range = self.terminal.tag_prevrange("link", idx + " + 1c")
-        if not range: return
-        text = self.terminal.get(*range).strip()
+        tag_range = self.terminal.tag_prevrange("link", idx + " + 1c")
+        if not tag_range: return
+        text = self.terminal.get(*tag_range).strip()
         
         url = ""
         if text.lower().startswith("http"):
             url = text
         elif text.lower().startswith("bug"):
-            bug_id = re.search(r"\d+", text).group()
-            url = f"https://bugzilla.mozilla.org/show_bug.cgi?id={bug_id}"
+            m = re.search(r"\d+", text)
+            if m:
+                url = f"https://bugzilla.mozilla.org/show_bug.cgi?id={m.group()}"
         elif text.startswith("D") or text.startswith("d"):
             url = f"https://phabricator.services.mozilla.com/{text.upper()}"
         
@@ -1143,6 +1610,46 @@ class TreeherderTool(tk.Tk):
                 return
 
         self.open_wpt_editor(meta_path, subtest_name)
+        
+    def do_batch_wpt(self):
+        """Feature: Parse a multiline paste of many FAIL/TIMEOUT logs and extract the paths."""
+        top = self._make_popup("Batch Update WPT", 300, 600)
+        
+        tk.Label(top, text="Paste multiple lines containing TEST-UNEXPECTED:", 
+                 bg=self.T["bg"], fg=self.T["dim_fg"], font=("Helvetica", 11)).pack(pady=(12, 4))
+                 
+        text_area = tk.Text(top, bg=self.T["bg2"], fg=self.T["fg"], font=("Consolas", 10), height=8)
+        text_area.pack(fill=tk.BOTH, expand=True, padx=12, pady=4)
+        
+        def process(ev=None):
+            content = text_area.get("1.0", tk.END)
+            top.destroy()
+            
+            # Simple unique file extraction
+            files_to_open = set()
+            for line in content.splitlines():
+                if "TEST-UNEXPECTED" in line:
+                    m = re.search(r"TEST-UNEXPECTED\s*\|\s*([^|]+)\s*\|", line)
+                    if m:
+                        test_path = m.group(1).strip()
+                        files_to_open.add(test_path)
+            
+            if not files_to_open:
+                messagebox.showerror("Error", "No valid paths found in the pasted data.")
+                return
+                
+            cwd = self._cwd()
+            meta_root = os.path.join(cwd, "testing", "web-platform", "meta")
+            
+            for test_path in sorted(list(files_to_open)):
+                relative_meta = test_path.lstrip("/") + ".ini" # type: ignore
+                meta_path = os.path.join(meta_root, relative_meta)
+                if os.path.exists(meta_path):
+                    self.open_wpt_editor(meta_path, os.path.basename(test_path))
+                else:
+                    self.process_queue.put(("log", f"\n> Skipping new file creation in Batch Mode: {relative_meta}\n"))
+                    
+        self._ok_cancel(top, process, lambda ev=None: top.destroy())
 
     def open_wpt_editor(self, meta_path, subtest_name):
         top = self._make_popup(f"WPT Editor: {os.path.basename(meta_path)}", 600)
