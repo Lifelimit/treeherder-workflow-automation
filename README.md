@@ -1,21 +1,22 @@
 # Treeherder Workflow Automation Tool
 
-A self-contained desktop GUI for Firefox Treeherder development workflows — reverting, cherry-picking, and landing patches via Mozilla's Lando service.
+A self-contained desktop GUI for Firefox Treeherder development workflows — reverting, cherry-picking, landing patches via Mozilla's Lando service, and managing WPT metadata.
 
-## Features
+## Core Features
 
-- 🌗 **Automatic Light/Dark theme** — reads your OS system preference (macOS, Windows, Linux)
-- 🔀 **Branch switching** — dropdown auto-runs `git switch <branch>`
-- 📋 **Context-aware popups** — every action prompts only for what it needs
-- 📺 **Streaming terminal** — real-time subprocess output with coloured highlights
-- 🚀 **Lando integration** — push-commits and push-merge workflows built-in
+- 🌗 **Automatic Light/Dark Theme** — Reads your OS system preference (macOS, Windows, Linux).
+- 📺 **Streaming Terminal** — Real-time subprocess output with colored highlights, searchable logs, and link detection for Phabricator/Bugzilla.
+- 🛠️ **Environment Utilities** — One-click `pipx` installation and a system check tool to ensure all dependencies are ready.
+- 🚀 **Lando Integration** — `push-commits`, `push-merge`, and `merge-back` workflows built-in.
+- 🧹 **Linting Fixers** — Run `mach lint` (Prettier, Black, Whitespace) with automated `--fix` directly from the UI.
+- 🍱 **WPT Metadata Editor** — Quickly update Web Platform Test metadata for single tests or batch-process a list from a file.
 
 ## Requirements
 
-- Python 3.10+
-- `git` available on `PATH`
-- `lando` CLI available on `PATH`
-- No external Python packages needed (stdlib only)
+- **Python 3.10+** (included with macOS/Linux)
+- **Git** (for repository operations)
+- **Lando CLI** (can be installed via the "Utilities" tab)
+- **Firefox Clone** (mozilla-central, autoland, etc.)
 
 ## Usage
 
@@ -23,17 +24,18 @@ A self-contained desktop GUI for Firefox Treeherder development workflows — re
 python3 treeherder_app.py
 ```
 
-Set the **Firefox Repo Path** browser to your local Firefox clone. All `git` and `lando` commands will run inside that directory.
+1. Launch the app.
+2. Click **"Browse..."** to select your local Firefox repository root.
+3. Use the **Utilities > Check System** button to verify your environment.
+4. Go! All actions are logged in the terminal with context-aware shortcuts.
 
 ## Workflows
 
-| Button | Action |
+| Category | Actions |
 |---|---|
-| Git Fetch | `git fetch` |
-| Git Pull | `git pull` |
-| Single Revert | Pull → revert hash → amend message with reason → lando push-commits |
-| Multiple Revert | Pull → revert range → interactive rebase squash → lando push-commits |
-| Cherry-Pick | Pull → cherry-pick → lando push-commits |
-| Lando Merge | `lando push-merge` between main ↔ autoland |
-| Lando Merge Back | `lando push-merge` main → autoland |
-| Lando Push | `lando push-commits` on the active branch |
+| **Git & Repo** | Fetch, Pull, Branch Switch, Sync Lando CLI |
+| **Lando Flow** | Push Commits, Merge Main ↔ Autoland, Push Merge-Back |
+| **Reverts** | Single Revert (with reason), Multiple Revert (interactive rebase) |
+| **Linting** | Prettier --fix, Black --fix, Whitespace --fix |
+| **WPT** | Update Metadata, Batch Process Test List |
+| **Utilities** | System Check, Install Pipx, Lando Sync |
