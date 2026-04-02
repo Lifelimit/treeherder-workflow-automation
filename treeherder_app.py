@@ -1329,13 +1329,20 @@ class TreeherderTool(tk.Tk):
                 os.unlink(tmp)
             
             final_msg = self.get_output(["git", "log", "-1", "--pretty=%B"])
-            if not self.ask_yes_no_threadsafe("Verify Commit Message", f"Does this commit message look correct?\n\n{final_msg.strip()}\n\nClick Yes to push to Lando, or No to abort and keep it locally."):
-                raise Exception("Push aborted by user. The revert commit is preserved locally for manual editing.")
+            if not self.ask_yes_no_threadsafe("Verify Commit Message", f"Does this commit message look correct?\n\n{final_msg.strip()}\n\nClick YES to push to Lando now.\nClick NO to keep locally and batch with other commits."):
+                self.process_queue.put(("log", "\n> [Batch Mode] Commit kept locally. Run more workflows, or use 'Lando Push' when ready.\n"))
+                return
             
-            # Use lando to push, then drop the internal commit so we don't accidentally push it upstream later
-            self.run_cmd(["lando", "push-commits", "--lando-repo", f"firefox-{self.branch_var.get()}"])
-            self.run_cmd(["git", "reset", "--hard", "HEAD~1"])
-            self.process_queue.put(("log", "\n> [Cleanup] Dropped local revert commit (HEAD~1) after successful lando push.\n"))
+            branch = self.branch_var.get()
+            try:
+                count = self.get_output(["git", "rev-list", "--count", f"origin/{branch}..HEAD"]).strip()
+            except Exception:
+                count = "1"
+                
+            self.run_cmd(["lando", "push-commits", "--lando-repo", f"firefox-{branch}"])
+            if count != "0":
+                self.run_cmd(["git", "reset", "--hard", f"HEAD~{count}"])
+                self.process_queue.put(("log", f"\n> [Cleanup] Dropped {count} local commit(s) after successful lando push.\n"))
 
         self.execute_workflow("Single Revert", logic)
 
@@ -1404,13 +1411,20 @@ class TreeherderTool(tk.Tk):
                 os.unlink(seq_f); os.unlink(msg_f)
                 
             final_msg = self.get_output(["git", "log", "-1", "--pretty=%B"])
-            if not self.ask_yes_no_threadsafe("Verify Commit Message", f"Does this squash commit message look correct?\n\n{final_msg.strip()}\n\nClick Yes to push to Lando, or No to abort and keep it locally."):
-                raise Exception("Push aborted by user. The squashed commit is preserved locally for manual editing.")
+            if not self.ask_yes_no_threadsafe("Verify Commit Message", f"Does this squash commit message look correct?\n\n{final_msg.strip()}\n\nClick YES to push to Lando now.\nClick NO to keep locally and batch with other commits."):
+                self.process_queue.put(("log", "\n> [Batch Mode] Squashed commit kept locally. Run more workflows, or use 'Lando Push' when ready.\n"))
+                return
                 
-            # Use lando to push, then drop the squash commit (rebase reduced it to 1 commit)
-            self.run_cmd(["lando", "push-commits", "--lando-repo", f"firefox-{self.branch_var.get()}"])
-            self.run_cmd(["git", "reset", "--hard", "HEAD~1"])
-            self.process_queue.put(("log", "\n> [Cleanup] Dropped local squashed revert (HEAD~1) after successful lando push.\n"))
+            branch = self.branch_var.get()
+            try:
+                count = self.get_output(["git", "rev-list", "--count", f"origin/{branch}..HEAD"]).strip()
+            except Exception:
+                count = "1"
+
+            self.run_cmd(["lando", "push-commits", "--lando-repo", f"firefox-{branch}"])
+            if count != "0":
+                self.run_cmd(["git", "reset", "--hard", f"HEAD~{count}"])
+                self.process_queue.put(("log", f"\n> [Cleanup] Dropped {count} local commit(s) after successful lando push.\n"))
 
         self.execute_workflow("Multiple Reverts (Rebase & Squash)", logic)
 
@@ -1446,12 +1460,20 @@ class TreeherderTool(tk.Tk):
             self.run_cmd(["git", "cherry-pick"] + hashes)
             
             final_msg = self.get_output(["git", "log", "-1", "--pretty=%B"])
-            if not self.ask_yes_no_threadsafe("Verify Cherry-Pick", f"Successfully cherry-picked {len(hashes)} commit(s).\n\nLatest commit message:\n{final_msg.strip()}\n\nClick Yes to push to Lando, or No to abort and keep them locally."):
-                raise Exception("Push aborted by user. Cherry-picked commits preserved locally.")
+            if not self.ask_yes_no_threadsafe("Verify Cherry-Pick", f"Successfully cherry-picked {len(hashes)} commit(s).\n\nLatest commit message:\n{final_msg.strip()}\n\nClick YES to push to Lando now.\nClick NO to keep locally and batch with other commits."):
+                self.process_queue.put(("log", "\n> [Batch Mode] Cherry-picks kept locally. Run more workflows, or use 'Lando Push' when ready.\n"))
+                return
             
-            self.run_cmd(["lando", "push-commits", "--lando-repo", f"firefox-{self.branch_var.get()}"])
-            self.run_cmd(["git", "reset", "--hard", f"HEAD~{len(hashes)}"])
-            self.process_queue.put(("log", f"\n> [Cleanup] Dropped passed cherry-picks (HEAD~{len(hashes)}) after successful lando push.\n"))
+            branch = self.branch_var.get()
+            try:
+                count = self.get_output(["git", "rev-list", "--count", f"origin/{branch}..HEAD"]).strip()
+            except Exception:
+                count = str(len(hashes))
+
+            self.run_cmd(["lando", "push-commits", "--lando-repo", f"firefox-{branch}"])
+            if count != "0":
+                self.run_cmd(["git", "reset", "--hard", f"HEAD~{count}"])
+                self.process_queue.put(("log", f"\n> [Cleanup] Dropped {count} local commit(s) after successful lando push.\n"))
 
         self.execute_workflow("Cherry-Pick", logic)
 
@@ -1919,18 +1941,24 @@ class TreeherderTool(tk.Tk):
                 self.process_queue.put(("log", f"> Committed: {msg}\n"))
                 
                 # 6. Push confirmation
-                if self.ask_yes_no_threadsafe("Push to Lando?", f"Commit created:\n\n{msg}\n\nPush to Lando now?"):
+                if self.ask_yes_no_threadsafe("Push to Lando?", f"Commit created:\n\n{msg}\n\nClick YES to push to Lando now.\nClick NO to keep locally and batch with other commits."):
                     branch = self.branch_var.get()
                     lando_repo = f"firefox-{branch}"
                     self.process_queue.put(("log", f"> Pushing to Lando ({lando_repo})...\n"))
+                    
+                    try:
+                        count = subprocess.check_output(["git", "rev-list", "--count", f"origin/{branch}..HEAD"], cwd=cwd, text=True).strip()
+                    except Exception:
+                        count = "1"
+                        
                     self._run_command_inline(["lando", "push-commits", "--lando-repo", lando_repo])
                     
-                    # 7. Local Reset
-                    self.process_queue.put(("log", "> Rolling back local commit (git reset --hard HEAD~1)...\n"))
-                    self._run_command_inline(["git", "reset", "--hard", "HEAD~1"])
+                    if count != "0":
+                        self.process_queue.put(("log", f"> Rolling back {count} local commit(s) (git reset --hard HEAD~{count})...\n"))
+                        self._run_command_inline(["git", "reset", "--hard", f"HEAD~{count}"])
                     self.process_queue.put(("log", ">>> Lint Fix Workflow Complete.\n"))
                 else:
-                    self.process_queue.put(("log", "> Push aborted. Commit kept locally.\n"))
+                    self.process_queue.put(("log", "> [Batch Mode] Push aborted. Commit kept locally.\n"))
 
             threading.Thread(target=work, daemon=True).start()
 
