@@ -157,7 +157,6 @@ class Tooltip:
         # Determine tooltip theme based on app's current theme (via widget Master)
         bg = "#333333" if getattr(self.widget.master, "_dark", True) else "#ffffff"
         fg = "#ffffff" if getattr(self.widget.master, "_dark", True) else "#333333"
-        border = "#555555" if getattr(self.widget.master, "_dark", True) else "#cccccc"
 
         label = tk.Label(tw, text=self.text, justify=tk.LEFT,
                          background=bg, foreground=fg, relief=tk.SOLID, borderwidth=1,
@@ -585,6 +584,7 @@ class TreeherderTool(tk.Tk):
                         tag = ()
                     self.terminal.insert(tk.END, s, tag)
                     self._linkify_terminal()
+                    self._trim_terminal()
                     self.terminal.see(tk.END)
                     self.terminal.config(state=tk.DISABLED)
                 elif msg_type == "alert":
@@ -599,6 +599,15 @@ class TreeherderTool(tk.Tk):
             pass
         if self.winfo_exists():
             self.after(100, self.check_queue)
+
+    _TERMINAL_MAX_LINES = 5000
+
+    def _trim_terminal(self):
+        """Keep the terminal buffer capped at _TERMINAL_MAX_LINES to prevent memory bloat."""
+        line_count = int(self.terminal.index("end-1c").split(".")[0])
+        if line_count > self._TERMINAL_MAX_LINES:
+            overshoot = line_count - self._TERMINAL_MAX_LINES
+            self.terminal.delete("1.0", f"{overshoot}.0")
 
     def set_buttons_state(self, state):
         if not self.winfo_exists(): return
@@ -784,8 +793,6 @@ class TreeherderTool(tk.Tk):
                 json.dump(data, f, indent=2)
         except Exception:
             pass
-
-
 
     def _save_repo_path(self, path: str):
         if not path: return
@@ -1010,26 +1017,6 @@ class TreeherderTool(tk.Tk):
         e["PATH"] = additions + os.pathsep + current_path if additions else current_path
         return e
 
-    def _run_command_inline(self, cmd, env=None, cwd=None):
-        """Run a command synchronously and stream its output to the UI terminal."""
-        cwd = cwd or self._cwd()
-        env = self._build_env(env)
-        process = subprocess.Popen(
-            cmd,
-            stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,
-            text=True,
-            cwd=cwd,
-            env=env,
-            bufsize=1,
-            universal_newlines=True
-        )
-        if process.stdout:
-            for line in process.stdout: # type: ignore
-                self.process_queue.put(("log", line))
-        process.wait()
-        return process.returncode
-
     def run_cmd(self, cmd, env=None, cwd=None):
         cwd = cwd or self._cwd()
         env = self._build_env(env)
@@ -1247,6 +1234,10 @@ class TreeherderTool(tk.Tk):
         if not n: return
         if not n.isdigit():
             messagebox.showerror("Error", "Please enter a valid number.")
+            return
+        if not messagebox.askyesno("⚠ Confirm Hard Reset",
+                f"This will PERMANENTLY discard the last {n} commit(s).\n\n"
+                f"Are you sure you want to run:\n  git reset --hard HEAD~{n}"):
             return
 
         def logic():
@@ -1545,12 +1536,18 @@ class TreeherderTool(tk.Tk):
         refresh_log()
 
     def do_export_terminal(self):
-        """Feature: Fast terminal log export."""
+        """Feature: Terminal log export with file dialog."""
         text = self.terminal.get("1.0", tk.END)
-        # Suggest a timestamped filename in Desktop
-        filename = f"treeherder_log_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
-        desktop = os.path.expanduser("~/Desktop")
-        filepath = os.path.join(desktop, filename)
+        default_name = f"treeherder_log_{datetime.datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        filepath = filedialog.asksaveasfilename(
+            initialdir=os.path.expanduser("~/Desktop"),
+            initialfile=default_name,
+            defaultextension=".txt",
+            filetypes=[("Text Files", "*.txt"), ("Log Files", "*.log"), ("All Files", "*.*")],
+            title="Save Terminal Log"
+        )
+        if not filepath:
+            return
         try:
             with open(filepath, "w", encoding="utf-8") as f:
                 f.write(text)
