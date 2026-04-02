@@ -4,8 +4,9 @@ A self-contained desktop GUI for Firefox Treeherder development workflows — re
 
 ## Core Features
 
-- 🌗 **Automatic Light/Dark Theme** — Reads your OS system preference (macOS, Windows, Linux).
+- 🌓 **Automatic Light/Dark Theme** — Reads your OS system preference (macOS, Windows, Linux).
 - 📺 **Streaming Terminal** — Real-time subprocess output with colored highlights, searchable logs, and link detection for Phabricator/Bugzilla.
+- 📦 **Batch Accumulation Mode** — Keep multiple commits (reverts, cherry-picks, lint fixes) locally and push them all at once via the "Lando Push" button.
 - 🛠️ **Environment Utilities** — One-click `pipx` installation and a system check tool to ensure all dependencies are ready.
 - 🚀 **Lando Integration** — `push-commits`, `push-merge`, and `merge-back` workflows built-in.
 - 🧹 **Linting Fixers** — Run `mach lint` (Prettier, Black, Whitespace) with automated `--fix` directly from the UI.
@@ -34,7 +35,7 @@ python3 treeherder_app.py
 | Category | Actions |
 |---|---|
 | **Git & Repo** | Fetch, Pull, Branch Switch, Sync Lando CLI |
-| **Lando Flow** | Push Commits, Merge Main ↔ Autoland, Push Merge-Back |
+| **Lando Flow** | Push all local commits at once, or merge changesets between Main and Autoland. |
 | **Reverts** | Single Revert (with reason), Multiple Revert (interactive rebase) |
 | **Linting** | Prettier --fix, Black --fix, Whitespace --fix |
 | **WPT** | Update Metadata, Batch Process Test List |
