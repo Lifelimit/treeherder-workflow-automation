@@ -14,7 +14,7 @@ import webbrowser
 import re
 import time
 import datetime
-from typing import Any, Optional, List, Tuple, Union
+from typing import Any, Optional
 
 
 # ---------------------------------------------------------------------------
@@ -148,7 +148,6 @@ class Tooltip:
 
     def show_tip(self):
         if not self.widget.winfo_exists(): return
-        x, y, cx, cy = self.widget.bbox("insert")
         x = self.widget.winfo_rootx() + 20
         y = self.widget.winfo_rooty() + self.widget.winfo_height() + 5
         self.tip_window = tw = tk.Toplevel(self.widget)
@@ -287,7 +286,7 @@ class TreeherderTool(tk.Tk):
         tk.Label(top, text="Firefox Repo Path:", bg=T["bg"], fg=T["fg"],
                  font=("Helvetica", 11)).pack(side=tk.LEFT, padx=(0, 8))
 
-        default_repo = self._load_repo_path() or os.getcwd()
+        default_repo = os.getcwd()
         self.repo_var = tk.StringVar(value=default_repo)
         self.repo_var.trace_add("write", lambda n, i, m: self._save_repo_path(self.repo_var.get()))
 
@@ -476,7 +475,7 @@ class TreeherderTool(tk.Tk):
         self.terminal = tk.Text(
             term_frame, bg=T["term_bg"], fg=T["term_fg"],
             font=("Consolas", 10), state=tk.DISABLED, wrap=tk.WORD,
-            undo=True, height=15
+            height=15
         )
         self.terminal.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
 
@@ -599,10 +598,12 @@ class TreeherderTool(tk.Tk):
 
     def set_buttons_state(self, state):
         if not self.winfo_exists(): return
-        # Note: We no longer set tk.DISABLED on the custom Label buttons 
-        # to avoid the 'graying out' of text. We rely on is_running_command guard.
         for b in self.btn_widgets:
-            pass # Keep them visually "enabled" but logically guarded
+            prefix = getattr(b, "key_prefix", "git")
+            if state == tk.DISABLED:
+                b.config(fg=self.T["fg_disabled"], cursor="watch")
+            else:
+                b.config(fg=self.T["btn_fg"], cursor="hand2")
 
     # -----------------------------------------------------------------------
     # Popup helpers  (main-thread blocking via wait_window)
@@ -780,8 +781,7 @@ class TreeherderTool(tk.Tk):
         except Exception:
             pass
 
-    def _load_repo_path(self) -> str | None:
-        return None  # Deferred to _load_config
+
 
     def _save_repo_path(self, path: str):
         if not path: return
@@ -806,7 +806,7 @@ class TreeherderTool(tk.Tk):
         
         def worker():
             try:
-                subprocess.run(["git", "fetch", "--quiet"], cwd=self._cwd(), check=True)
+                subprocess.run(["git", "fetch", "--quiet"], cwd=self._cwd(), check=True, env=self._build_env())
                 # Once fetch finishes in background, refresh status gently
                 self.after(0, self._update_git_status)
             except Exception:
@@ -884,7 +884,7 @@ class TreeherderTool(tk.Tk):
                 # 2. ALWAYS recurse into children if they exist
                 if child.winfo_children(): # type: ignore
                     self._apply_theme_to_widgets(child)
-            except:
+            except Exception:
                 pass
 
     def _toggle_theme(self):
@@ -1022,9 +1022,10 @@ class TreeherderTool(tk.Tk):
         cwd = cwd or self._cwd()
         env = self._build_env(env)
         self.process_queue.put(("log", f"\n> {' '.join(cmd)}\n"))
-        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, stdin=subprocess.PIPE,
-                                text=True, env=env, cwd=cwd)
         is_interactive = cmd and cmd[0] == "lando"
+        proc = subprocess.Popen(cmd, stdout=subprocess.PIPE, stderr=subprocess.STDOUT,
+                                stdin=subprocess.PIPE if is_interactive else subprocess.DEVNULL,
+                                text=True, env=env, cwd=cwd)
         buf: str = ""
         while True:
             if not proc.stdout: break
@@ -1066,6 +1067,17 @@ class TreeherderTool(tk.Tk):
             self.process_queue.put(("log", err + "\n"))
             raise subprocess.CalledProcessError(proc.returncode, cmd, out, err)
         return out
+
+    def _push_and_cleanup(self, branch: str, fallback_count: str = "1"):
+        """Push local commits to Lando and reset the local branch afterward."""
+        try:
+            count = self.get_output(["git", "rev-list", "--count", f"origin/{branch}..HEAD"]).strip()
+        except Exception:
+            count = fallback_count
+        self.run_cmd(["lando", "push-commits", "--lando-repo", f"firefox-{branch}"])
+        if count != "0":
+            self.run_cmd(["git", "reset", "--hard", f"HEAD~{count}"])
+            self.process_queue.put(("log", f"\n> [Cleanup] Dropped {count} local commit(s) after successful lando push.\n"))
 
     def execute_workflow(self, name: str, fn):
         if self.is_running_command:
@@ -1241,68 +1253,6 @@ class TreeherderTool(tk.Tk):
             
         self.execute_workflow("Undo Last Workflow", logic)
 
-    def do_view_log(self):
-        top = self._make_popup("Git Log (Last 50)", 500, 700)
-        T = self.T
-        
-        top_frame = tk.Frame(top, bg=T["bg"])
-        top_frame.pack(fill=tk.X, padx=10, pady=5)
-        
-        tk.Label(top_frame, text="Double-click a line to copy hash to clipboard", 
-                 bg=T["bg"], fg=T["dim_fg"], font=("Helvetica", 10)).pack(side=tk.LEFT)
-        
-        list_frame = tk.Frame(top, bg=T["bg"])
-        list_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=(0, 10))
-        
-        sb = ttk.Scrollbar(list_frame)
-        sb.pack(side=tk.RIGHT, fill=tk.Y)
-        
-        listbox = tk.Listbox(list_frame, bg=T["bg2"], fg=T["fg"], font=("Consolas", 10),
-                             yscrollcommand=sb.set, relief=tk.FLAT, highlightthickness=0)
-        listbox.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
-        sb.config(command=listbox.yview)
-
-        author_email = ""
-        try:
-            author_email = subprocess.check_output(["git", "config", "user.email"], 
-                                                   cwd=self._cwd(), text=True, stderr=subprocess.DEVNULL).strip()
-        except: pass
-        
-        only_me_var = tk.BooleanVar(value=False)
-
-        def refresh_log():
-            listbox.delete(0, tk.END)
-            cmd = ["git", "log", "-n", "50", "--oneline"]
-            if only_me_var.get() and author_email:
-                cmd.append(f"--author={author_email}")
-            
-            try:
-                out = subprocess.check_output(cmd, cwd=self._cwd(), text=True, stderr=subprocess.DEVNULL)
-                for line in out.splitlines():
-                    if line.strip():
-                        listbox.insert(tk.END, f" {line.strip()}")
-            except subprocess.CalledProcessError:
-                listbox.insert(tk.END, " Failed to fetch git log.")
-
-        if author_email:
-            chk = tk.Checkbutton(top_frame, text="Show only my commits", variable=only_me_var, 
-                                 command=refresh_log, bg=T["bg"], fg=T["fg"], selectcolor=T["bg2"], activebackground=T["bg"])
-            chk.pack(side=tk.RIGHT)
-
-        def on_double_click(event):
-            sel = listbox.curselection()
-            if not sel: return
-            line = listbox.get(sel[0]).strip()
-            if not line: return
-            hash_val = line.split(" ", 1)[0]
-            # Strip decorator brackets if they accidentally click a ref
-            hash_val = hash_val.replace("(", "").replace(")", "")
-            self.clipboard_clear()
-            self.clipboard_append(hash_val)
-            messagebox.showinfo("Copied!", f"Hash '{hash_val}' copied to clipboard!", parent=top)
-
-        listbox.bind("<Double-1>", on_double_click)
-        refresh_log()
 
     def do_single_revert(self):
         _h = self.ask_input_with_history("Single Revert", "Changeset hash to revert:")
@@ -1333,16 +1283,7 @@ class TreeherderTool(tk.Tk):
                 self.process_queue.put(("log", "\n> [Batch Mode] Commit kept locally. Run more workflows, or use 'Lando Push' when ready.\n"))
                 return
             
-            branch = self.branch_var.get()
-            try:
-                count = self.get_output(["git", "rev-list", "--count", f"origin/{branch}..HEAD"]).strip()
-            except Exception:
-                count = "1"
-                
-            self.run_cmd(["lando", "push-commits", "--lando-repo", f"firefox-{branch}"])
-            if count != "0":
-                self.run_cmd(["git", "reset", "--hard", f"HEAD~{count}"])
-                self.process_queue.put(("log", f"\n> [Cleanup] Dropped {count} local commit(s) after successful lando push.\n"))
+            self._push_and_cleanup(self.branch_var.get())
 
         self.execute_workflow("Single Revert", logic)
 
@@ -1415,16 +1356,7 @@ class TreeherderTool(tk.Tk):
                 self.process_queue.put(("log", "\n> [Batch Mode] Squashed commit kept locally. Run more workflows, or use 'Lando Push' when ready.\n"))
                 return
                 
-            branch = self.branch_var.get()
-            try:
-                count = self.get_output(["git", "rev-list", "--count", f"origin/{branch}..HEAD"]).strip()
-            except Exception:
-                count = "1"
-
-            self.run_cmd(["lando", "push-commits", "--lando-repo", f"firefox-{branch}"])
-            if count != "0":
-                self.run_cmd(["git", "reset", "--hard", f"HEAD~{count}"])
-                self.process_queue.put(("log", f"\n> [Cleanup] Dropped {count} local commit(s) after successful lando push.\n"))
+            self._push_and_cleanup(self.branch_var.get())
 
         self.execute_workflow("Multiple Reverts (Rebase & Squash)", logic)
 
@@ -1464,16 +1396,7 @@ class TreeherderTool(tk.Tk):
                 self.process_queue.put(("log", "\n> [Batch Mode] Cherry-picks kept locally. Run more workflows, or use 'Lando Push' when ready.\n"))
                 return
             
-            branch = self.branch_var.get()
-            try:
-                count = self.get_output(["git", "rev-list", "--count", f"origin/{branch}..HEAD"]).strip()
-            except Exception:
-                count = str(len(hashes))
-
-            self.run_cmd(["lando", "push-commits", "--lando-repo", f"firefox-{branch}"])
-            if count != "0":
-                self.run_cmd(["git", "reset", "--hard", f"HEAD~{count}"])
-                self.process_queue.put(("log", f"\n> [Cleanup] Dropped {count} local commit(s) after successful lando push.\n"))
+            self._push_and_cleanup(self.branch_var.get(), fallback_count=str(len(hashes)))
 
         self.execute_workflow("Cherry-Pick", logic)
 
@@ -1482,20 +1405,15 @@ class TreeherderTool(tk.Tk):
         def logic():
             self.run_cmd(["git", "pull"])
             
-            count = "0"
-            # Guard: check if we actually have any commits to push
+            # Guard: abort early if there are no local commits to push
             try:
                 count = self.get_output(["git", "rev-list", "--count", f"origin/{branch}..HEAD"]).strip()
                 if count == "0":
-                    raise Exception(f"Guard failed: You have 0 local unpushed commits on '{branch}'. Aborting lando push.")
+                    raise Exception(f"You have 0 local unpushed commits on '{branch}'. Nothing to push.")
             except subprocess.CalledProcessError:
-                # If origin doesn't exist or git command fails, just proceed and let lando try
-                pass
+                pass  # If origin tracking doesn't exist, let lando try anyway
 
-            self.run_cmd(["lando", "push-commits", "--lando-repo", f"firefox-{branch}"])
-            if count != "0":
-                self.run_cmd(["git", "reset", "--hard", f"HEAD~{count}"])
-                self.process_queue.put(("log", f"\n> [Cleanup] Dropped {count} commits after successful standalone lando push.\n"))
+            self._push_and_cleanup(branch)
 
         self.execute_workflow("Lando Push", logic)
 
@@ -1905,7 +1823,7 @@ class TreeherderTool(tk.Tk):
                 self.process_queue.put(("log", f"\n>>> Starting Automated {linter_type.upper()} Fix Workflow...\n"))
                 
                 # 1. git pull
-                self._run_command_inline(["git", "pull"])
+                self.run_cmd(["git", "pull"])
                 
                 # 2. Run linter
                 if linter_type == "prettier":
@@ -1917,17 +1835,19 @@ class TreeherderTool(tk.Tk):
                 
                 self.process_queue.put(("log", f"> Running: {' '.join(cmd)}\n"))
                 # Linters often exit >0 if they fix things but leave warnings. We ignore exit code.
-                subprocess.run(cmd, cwd=cwd, capture_output=True)
+                subprocess.run(cmd, cwd=cwd, capture_output=True, env=self._build_env())
                 
                 # 3. Check for modifications
-                status = subprocess.check_output(["git", "status", "--porcelain"] + paths, cwd=cwd).decode().strip()
+                status = subprocess.check_output(
+                    ["git", "status", "--porcelain"] + paths,
+                    cwd=cwd, text=True, env=self._build_env()
+                ).strip()
                 if not status:
-                    self.process_queue.put(("log", "> No changes detected after linting. Aborting.\n"))
-                    messagebox.showinfo("Lint Fix", "No files were modified by the linter.")
+                    self.process_queue.put(("log", "> No changes detected after linting. Nothing to commit.\n"))
                     return
 
                 # 4. git add
-                self._run_command_inline(["git", "add"] + paths)
+                self.run_cmd(["git", "add"] + paths)
                 
                 # 5. Commit formatting
                 suffix = "a=lint-fix"
@@ -1937,30 +1857,19 @@ class TreeherderTool(tk.Tk):
                 else:
                     msg = f"Bug {bug_no} - Fix lint failure {suffix}"
                 
-                self._run_command_inline(["git", "commit", "-m", msg])
+                self.run_cmd(["git", "commit", "-m", msg])
                 self.process_queue.put(("log", f"> Committed: {msg}\n"))
                 
                 # 6. Push confirmation
                 if self.ask_yes_no_threadsafe("Push to Lando?", f"Commit created:\n\n{msg}\n\nClick YES to push to Lando now.\nClick NO to keep locally and batch with other commits."):
                     branch = self.branch_var.get()
-                    lando_repo = f"firefox-{branch}"
-                    self.process_queue.put(("log", f"> Pushing to Lando ({lando_repo})...\n"))
-                    
-                    try:
-                        count = subprocess.check_output(["git", "rev-list", "--count", f"origin/{branch}..HEAD"], cwd=cwd, text=True).strip()
-                    except Exception:
-                        count = "1"
-                        
-                    self._run_command_inline(["lando", "push-commits", "--lando-repo", lando_repo])
-                    
-                    if count != "0":
-                        self.process_queue.put(("log", f"> Rolling back {count} local commit(s) (git reset --hard HEAD~{count})...\n"))
-                        self._run_command_inline(["git", "reset", "--hard", f"HEAD~{count}"])
+                    self.process_queue.put(("log", f"> Pushing to Lando (firefox-{branch})...\n"))
+                    self._push_and_cleanup(branch)
                     self.process_queue.put(("log", ">>> Lint Fix Workflow Complete.\n"))
                 else:
                     self.process_queue.put(("log", "> [Batch Mode] Push aborted. Commit kept locally.\n"))
 
-            threading.Thread(target=work, daemon=True).start()
+            self.execute_workflow(f"Lint Fix ({linter_type.title()})", work)
 
         self._ok_cancel(top, start_workflow, lambda ev=None: top.destroy())
 
