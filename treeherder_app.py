@@ -230,6 +230,7 @@ class TreeherderTool(tk.Tk):
         
         # Feature: Theme toggle
         self._theme_toggle_label: tk.Label = None # type: ignore
+        self._lando_push_btn: tk.Label = None # type: ignore
 
         # Load persistent config
         self._load_config()
@@ -539,6 +540,9 @@ class TreeherderTool(tk.Tk):
         b.bind("<Leave>", on_leave)
         b.config(cursor="hand2")
         
+        if text == "Lando Push":
+            self._lando_push_btn = b
+
         b.key_prefix = key_prefix # type: ignore
         self.btn_widgets.append(b)
         
@@ -969,12 +973,16 @@ class TreeherderTool(tk.Tk):
                 elif ahead > 0:
                     self.status_var.set(f"Status: ↑ {ahead} unpushed")
                     self.status_label.config(fg=self.T["ok_fg"])
+                    if self._lando_push_btn:
+                        self._lando_push_btn.config(text=f"Lando Push ({ahead} pending)")
                 elif behind > 0:
                     self.status_var.set(f"Status: ↓ {behind} behind")
                     self.status_label.config(fg=self.T["info_fg"])
                 else:
                     self.status_var.set("Status: ✓ Clean")
                     self.status_label.config(fg=self.T["dim_fg"])
+                    if self._lando_push_btn:
+                        self._lando_push_btn.config(text="Lando Push")
         except Exception:
             self.status_var.set("Status: ?")
             self.status_label.config(fg=self.T["dim_fg"])
