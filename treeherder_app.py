@@ -611,12 +611,9 @@ class TreeherderTool(tk.Tk):
 
     def set_buttons_state(self, state):
         if not self.winfo_exists(): return
+        cursor = "watch" if state == tk.DISABLED else "hand2"
         for b in self.btn_widgets:
-            prefix = getattr(b, "key_prefix", "git")
-            if state == tk.DISABLED:
-                b.config(fg=self.T["fg_disabled"], cursor="watch")
-            else:
-                b.config(fg=self.T["btn_fg"], cursor="hand2")
+            b.config(cursor=cursor)
 
     # -----------------------------------------------------------------------
     # Popup helpers  (main-thread blocking via wait_window)
