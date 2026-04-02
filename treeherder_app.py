@@ -970,6 +970,8 @@ class TreeherderTool(tk.Tk):
                 if ahead > 0 and behind > 0:
                     self.status_var.set(f"Status: ↓ {behind} ↑ {ahead}")
                     self.status_label.config(fg="#ffaa00")
+                    if self._lando_push_btn:
+                        self._lando_push_btn.config(text=f"Lando Push ({ahead} pending)")
                 elif ahead > 0:
                     self.status_var.set(f"Status: ↑ {ahead} unpushed")
                     self.status_label.config(fg=self.T["ok_fg"])
@@ -978,6 +980,8 @@ class TreeherderTool(tk.Tk):
                 elif behind > 0:
                     self.status_var.set(f"Status: ↓ {behind} behind")
                     self.status_label.config(fg=self.T["info_fg"])
+                    if self._lando_push_btn:
+                        self._lando_push_btn.config(text="Lando Push")
                 else:
                     self.status_var.set("Status: ✓ Clean")
                     self.status_label.config(fg=self.T["dim_fg"])
